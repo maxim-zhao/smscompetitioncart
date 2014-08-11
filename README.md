@@ -25,8 +25,9 @@ Part 3: Columns
 
 Play until game over, or until the timer runs out.
 
-Scoring:
+Scoring
+----
 
-Money collected in Alex Kidd in Miracle WOrld * 100 +
+Money collected in Alex Kidd in Miracle World × 100 +
 Score in Hang On +
-Score in Columns * 30
+Score in Columns × 30
