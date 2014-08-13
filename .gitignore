@@ -40,3 +40,10 @@ Icon
 *.sym
 *.psgcompr
 *.bin
+akbios.sms.asm
+palette.inc
+sonic.asm
+*.soniccompr
+*.pscompr
+*.PuCrunch
+*.aPLib

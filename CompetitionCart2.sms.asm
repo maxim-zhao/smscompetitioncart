@@ -12,7 +12,21 @@ banksize $4000
 banks 21
 .endro
 
-.define TEXT_MODE
+;.define TEXT_MODE
+
+.define TILE_COMPRESSION "aPLib" ; could be PSG, PS, raw, aPLib, PuCrunch, Sonic
+
+; Benchmarking the compression of our large tiles blob...
+;
+; Compression  Bytes  Ratio  Load time (cycles)  Ratio
+; None          9888   100%              494435   100%
+; PScompr       8472    86%             1354926   274%
+; Sonic 1       5616    57%             1026969   207%
+; PSGcompr      5116    52%             1600820   324%
+; PuCrunch      4109    42$             3475587   703%
+; aPLib         4058    41%             3640882   736%
+;
+; Decompressor sizes are not included in the byte counts.
 
 ; Macros
 
@@ -66,7 +80,11 @@ TopOfStack               db ; Rest of space is for games to use, they need to ha
 Port3EValue               db
 GameLoaderRAMAddress      dsb 255
 PSGMOD_START_ADDRESS      dsb 256 ; Must be 256-byte aligned...
-PSGDecoderBuffer          dsb 34
+aPLibMemory               .db ; needs 5
+PucrunchVars              .db ; needs 44
+PSGDecoderBuffer          .db ; needs 34
+Sonic1TileLoaderMemory    .db ; needs 8
+DecompressorBuffer        dsb 44
 NumberTileIndicesOffset   dw ; So I can choose colours
 .ende
 
@@ -233,11 +251,39 @@ InitialiseSystem:
   jr nz,-
 .else
   ; Load graphics
-  ld ix,Tiles
-  ld hl,$4000
   ld a,:Tiles
   ld ($8000),a
+.if TILE_COMPRESSION == "raw"
+  ld hl,Tiles
+  ld de,$4000
+  ld bc,TilesSize
+  call raw_decompress ; TODO
+.endif
+.if TILE_COMPRESSION == "PSG"
+  ld ix,Tiles
+  ld hl,$4000
   call PSG_decompress
+.endif
+.if TILE_COMPRESSION == "PS"
+  ld hl,Tiles
+  ld de,$4000
+  call LoadTiles4BitRLENoDI
+.endif
+.if TILE_COMPRESSION == "aPLib"
+  ld hl,Tiles
+  ld de,$4000
+  call aPLib_decompress
+.endif
+.if TILE_COMPRESSION == "PuCrunch"
+  ld hl,Tiles
+  ld de,$4000
+  call Uncrunch
+.endif
+.if TILE_COMPRESSION == "Sonic"
+  ld hl,Tiles
+  ld de,$4000
+  call Sonic1TileLoader_Decompress
+.endif
 .endif
   
   ; Start music
@@ -273,13 +319,70 @@ FontDataEnd:
 .slot 2
 .section "Graphics data" superfree
 Tiles:
+.if TILE_COMPRESSION == "raw"
+.incbin "Tiles.bin" fsize TilesSize
+.endif
+.if TILE_COMPRESSION == "PSG"
 .incbin "Tiles.psgcompr"
+.endif
+.if TILE_COMPRESSION == "PS"
+.incbin "Tiles.pscompr"
+.endif
+.if TILE_COMPRESSION == "aPLib"
+.incbin "Tiles.aPLib"
+.endif
+.if TILE_COMPRESSION == "PuCrunch"
+.incbin "Tiles.PuCrunch"
+.endif
+.if TILE_COMPRESSION == "Sonic"
+.incbin "Tiles.soniccompr"
+.endif
+.ends
+.section "Tilemaps" superfree
 Tilemaps:
 .incbin "Tilemaps.bin" skip 32*2*4 ; top 4 rows are digits
 .ends
 .slot 0
 
+.if TILE_COMPRESSION == "raw"
+.section "Raw data loader" free
+raw_decompress:
+  ; hl = src
+  ; de = dest
+  ; bc = count
+  ; Set VRAM address
+  ld a,e
+  out ($bf),a
+  ld a,d
+  out ($bf),a
+  ; Output
+-:ld a,(hl)
+  inc hl
+  out ($be),a
+  dec bc
+  ld a,b
+  or c
+  jr nz,-
+  ret
+.ends
+.endif
+.if TILE_COMPRESSION == "PSG"
 .include "Phantasy Star Gaiden decompressor.inc"
+.endif
+.if TILE_COMPRESSION == "PS"
+.include "Phantasy Star decompressors.inc"
+.endif
+.if TILE_COMPRESSION == "aPLib"
+.define aPLibToVRAM
+.include "aplib-z80.asm"
+.endif
+.if TILE_COMPRESSION == "PuCrunch"
+.define PuCrunchToVRAM
+.include "uncrunch-z80.asm"
+.endif
+.if TILE_COMPRESSION == "Sonic"
+.include "Sonic decompressor.inc"
+.endif
 .endif
 
 .section "Maths helpers" free
@@ -685,6 +788,8 @@ WaitForButton:
 .ifndef TEXT_MODE
 .section "Load a screen" free
 .macro LoadScreen args index
+  ld a,:Tilemaps
+  ld ($8000),a
   ld hl, Tilemaps + 32*24*2*index
   call LoadScreenImpl
 .endm
