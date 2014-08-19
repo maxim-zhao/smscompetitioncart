@@ -960,12 +960,29 @@ SonicStart:
   xor a
   ld (GameNumber),a
   ; Patch in where to go...
-;  ld hl,AKMWFrameHandler
-;  ld (JumpOutAddress), hl
+  ld hl,SonicFrameHandler
+  ld (JumpOutAddress), hl
 
   ; Jump to the game
   ld a,:Sonic
   jp LoadGame
+  
+; Useful RAM locations
+.define SonicRingCounter $d2aa ; BCD
+.define SonicLivesCounter $d246 ; Hex
+.define SonicTimeMinutes $d2ce ; 0-9
+.define SonicTimeSeconds $d2cf ; BCD
+  
+SonicFrameHandler:
+  ; All registers are free to use, we're in the VBlank handler 
+  call CheckForReset
+
+  ; Return to game
+  ld a,:Sonic
+  ld hl,SonicReturnAddress
+  push hl
+  jp JumpBack
+
 .ends
 
 .section "AKMW helpers" free
@@ -1444,6 +1461,7 @@ FinalResults:
   call ScreenOff
   jp 0
 
+.ifdef TEXT_MODE
 _text:
 .db "            GAME OVER           "
 .db "                                "
@@ -1465,7 +1483,7 @@ _text:
 .db "                                "
 .db "                                "
 .db "       Press 1 to restart", 0
-
+.endif
 .ends
 
 .section "Mod2PSG2" free
@@ -1487,7 +1505,7 @@ _text:
 .dsb 6 $00 ; unused bytes - must be zero
 .ends
 
-.smstag
+.smstag ; Not really needed but here for completeness
 
 ; The games
 
@@ -1990,6 +2008,10 @@ PSGMOD_VIBRATO_TABLES:
 Sonic:
 .incbin "Sonic The Hedgehog.sms" skip $00000 read $4000
 
+; Game hacks
+; Disable losing rings when hurt
+ nopOut $3645 3
+
 .org $000c
 .section "Sonic paging helpers 1" overwrite ; We are fitting around the interrupt vectors, we have to not trash what is there
 SonicPageHLFixup: ; 9/12 bytes
@@ -2020,8 +2042,17 @@ SonicPageDEFixup:
   ret             ; 1
 .ends
 
+.org $00db
+.section "Sonic VBlank hook" overwrite
+;    in     a,($dd)         ; 0000DB DB DD 
+;    and    $10             ; 0000DD E6 10 
+;    jp     z,$0000         ; 0000DF CA 00 00
+  jp JumpOut
+.define SonicReturnAddress $00e2
+.ends
+  
 .org $00e2
-.section "Sonic post VBlank fixup" overwrite
+.section "Sonic VBlank paging fixup" overwrite
 ;    pop    hl              ; 0000E2 E1 
 ;    ld     ($fffe),hl      ; 0000E3 22 FE FF 
 ;    ld     ($d235),hl      ; 0000E6 22 35 D2 
