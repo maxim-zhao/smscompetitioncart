@@ -7,14 +7,14 @@ defaultslot 0
 .endme
 
 .rombankmap
-bankstotal 21
+bankstotal 38
 banksize $4000
-banks 21
+banks 38
 .endro
 
 ;.define TEXT_MODE
 
-.define TILE_COMPRESSION "aPLib" ; could be PSG, PS, raw, aPLib, PuCrunch, Sonic
+.define TILE_COMPRESSION "Sonic" ; could be PSG, PS, raw, aPLib, PuCrunch, Sonic
 
 ; Benchmarking the compression of our large tiles blob...
 ;
@@ -173,7 +173,7 @@ start:
   call InitialiseSystem
   call TitleScreen
 
-  jp AKMWStart
+  jp SonicStart;AKMWStart
   
 .ends
 
@@ -953,7 +953,7 @@ CheckForReset:
   ; Reboot
   jp 0
 .ends
-/*
+
 .section "Sonic helpers" free
 SonicStart:
   ; Record the game number
@@ -967,7 +967,7 @@ SonicStart:
   ld a,:Sonic
   jp LoadGame
 .ends
-*/
+
 .section "AKMW helpers" free
 
 ; $c01f is the mode variable...
@@ -1558,7 +1558,7 @@ jr $0085-CADDR-1
   retn
 .ends
 
-.orga $00bc; was $00c4
+.orga $00bc
 .section "AKMW VBlank patch" overwrite
 ; Was reset button check in VBlank:
 ; in     a,($dd)         ; 0000BC DB DD 
@@ -1574,12 +1574,11 @@ jr $0085-CADDR-1
 .ends
 
 ; Move the stack down...
-; Non-BIOS patchWord $0003+1, TopOfStack ; move the stack down
- patchWord $0099+1, TopOfStack ; it's set twice was $00a4
- patchWord $008b+1 /* was $0093+1*/, TopOfStack - $c000 - 1 ; shorten range of memory cleared on startup
+ patchWord $0099+1, TopOfStack ; it's set twice
+ patchWord $008b+1, TopOfStack - $c000 - 1 ; shorten range of memory cleared on startup
 
 ; Disable title screen timeout
- nopOut $07cc, 1 ; was $07ff
+ nopOut $07cc, 1
 
 .macro AKMWPagingA
 ;    ld     a,$82           ; 000085 3E 82
@@ -1610,7 +1609,7 @@ jr $0085-CADDR-1
 .endm
 
 ; Choose starting level
- patchByte $07f5 5 ; Lake Fathom Part 2 ; was $0828
+ patchByte $07f5 5 ; Lake Fathom Part 2
 
 ; These were auto-generated...
  AKMWPagingA $0094, 2
@@ -1685,91 +1684,17 @@ jr $0085-CADDR-1
  AKMWPagingA $24c9, 6
  AKMWPagingA $25ba, 5
  AKMWPagingA $25d4, 2
-/*
- AKMWPagingA $0085, 2
- AKMWPagingA $009f, 2
- AKMWPagingA $0107, 2
- AKMWPagingA $04bc, 2
- AKMWPagingA $0787, 2
- AKMWPagingA $07ab, 4
- AKMWPagingA $0924, 2
- AKMWPagingA $0a12, 5
- AKMWPagingA $0a35, 5
- AKMWPagingA $0ac3, 2
- AKMWPagingA $0b3a, 5
- AKMWPagingA $0b48, 3
- AKMWPagingA $0b78, 2
- AKMWPagingA $0cae, 7
- AKMWPagingA $0cc8, 5
- AKMWPagingA $0cee, 2
- AKMWPagingA $10ff, 7
- AKMWPagingA $1134, 7
- AKMWPagingA $151e, 5
- AKMWPagingA $1544, 7
- AKMWPagingA $154a, 5
- AKMWPagingA $155b, 7
- AKMWPagingA $15a6, 5
- AKMWPagingA $1687, 2
- AKMWPagingA $16e0, 3
- AKMWPagingA $175e, 3
- AKMWPagingA $1771, 7
- AKMWPagingA $17a1, 5
- AKMWPagingA $1804, 2
- AKMWPagingA $18ae, 3
- AKMWPagingA $18d4, 2
- AKMWPagingA $18e2, 5
- AKMWPagingA $195d, 2
- AKMWPagingA $1973, 5
- AKMWPagingA $19cb, 2
- AKMWPagingA $1a01, 5
- AKMWPagingA $1a51, 2
- AKMWPagingA $1a65, 5
- AKMWPagingA $1add, 7
- AKMWPagingA $1b10, 3
- AKMWPagingA $1b26, 2
- AKMWPagingA $1b2e, 5
- AKMWPagingA $1c04, 6
- AKMWPagingA $1c39, 2
- AKMWPagingA $1c93, 3
- AKMWPagingA $1c9b, 5
- AKMWPagingA $1ca9, 2
- AKMWPagingA $1cb9, 7
- AKMWPagingA $1cec, 2
- AKMWPagingA $1d35, 5
- AKMWPagingA $1d55, 2
- AKMWPagingA $1d8b, 2
- AKMWPagingA $1d9e, 5
- AKMWPagingA $1e31, 6
- AKMWPagingA $1e97, 2
- AKMWPagingA $1fec, 2
- AKMWPagingA $2035, 3
- AKMWPagingA $204d, 5
- AKMWPagingA $205b, 7
- AKMWPagingA $207c, 5
- AKMWPagingA $209f, 5
- AKMWPagingA $20d9, 7
- AKMWPagingA $20e5, 2
- AKMWPagingA $21d7, 5
- AKMWPagingA $2236, 7
- AKMWPagingA $225e, 2
- AKMWPagingA $22ad, 2
- AKMWPagingA $22c0, 5
- AKMWPagingA $22e6, 7
- AKMWPagingA $23a4, 2
- AKMWPagingA $2501, 6
- AKMWPagingA $25f2, 5
- AKMWPagingA $260c, 2
-*/
+
 ; This leaves a few tricky spots...
 
 ;    ld     a,($ffff)       ; 0000DE 3A FF FF
-.orga $00ca ; was $00de
+.orga $00ca
 .section "Paging read fix part 1" overwrite
   ld a,(Slot2PageNumber)
 .ends
 ; ...
 ;    ld     ($ffff),a       ; 000114 32 FF FF
-.orga $0100 ; was $0114
+.orga $0100
 .section "Paging read fix part 2" overwrite
   call AKMWPagingHelper
 .ends
@@ -1777,7 +1702,7 @@ jr $0085-CADDR-1
 ;    ld     hl,$ffff        ; 000867 21 FF FF
 ;    ld     (hl),$84        ; 00086A 36 84
 ; Need to leave a alone... but hl is fair game (not used afterwards)
-.orga $0834 ; was $0867
+.orga $0834
 .section "Different type of paging" overwrite
   ld h,4+:AlexKiddInMiracleWorld
   call AKMWPagingHelper2
@@ -1814,36 +1739,13 @@ jr $0085-CADDR-1
  AKMWPagingA $7f47, 2
  AKMWPagingA $7f65, 7
 
-/*
- AKMWPagingA $41c8, 4
- AKMWPagingA $42f8, 5
- AKMWPagingA $437d, 4
- AKMWPagingA $43ca, 5
- AKMWPagingA $4b9e, 7
- AKMWPagingA $606c, 5
- AKMWPagingA $6077, 2
- AKMWPagingA $625e, 5
- AKMWPagingA $626f, 2
- AKMWPagingA $66c8, 2
- AKMWPagingA $6877, 5
- AKMWPagingA $6a90, 5
- AKMWPagingA $6b49, 2
- AKMWPagingA $6c30, 2
- AKMWPagingA $6dad, 2
- AKMWPagingA $71ff, 2
- AKMWPagingA $7932, 4
- AKMWPagingA $7e44, 2
- AKMWPagingA $7ed3, 2
- AKMWPagingA $7ef1, 7
-*/
-; non-BIOS AKMWPagingB $424d ; e.g. a = 85
- AKMWPagingB $6818 ; was $684f ; e.g. a = 86
- AKMWPagingB $6AF8 ; was $6b33 ; e.g. a = 85
+ AKMWPagingB $6818 ; e.g. a = 86
+ AKMWPagingB $6AF8 ; e.g. a = 85
 
- AKMWPagingC $6582 ; was $65b9
+ AKMWPagingC $6582
 
  ; Infinite lives
- patchByte $6bee+1, 0 ; sub 0 on dying ; was $6c29
+ patchByte $6bee+1, 0 ; sub 0 on dying
 ;    ld     hl,$c025        ; 006BEA 21 25 C0 
 ;    ld     a,(hl)          ; 006BED 7E 
 ;    sub    $01             ; 006BEE D6 01 
@@ -1852,7 +1754,7 @@ jr $0085-CADDR-1
 ;    ld     (hl),a          ; 006BF4 77 
 
 ; We add paging functions to the game, in some unused space...
-.orga $7d96 ; was $7fd0, for the BIOS we overwrite the BIOS stuff
+.orga $7d96 ; we overwrite the BIOS stuff
 .section "Paging helpers" overwrite
 AKMWPagingHelperWithMaskAndAdjustment:
   and $0f
@@ -1897,6 +1799,7 @@ AKMWPagingHelper2:
 .bank 12 slot 0
 .orga 0
 Columns:
+/*
 .incbin "Columns.sms" skip $00000 read $4000
 
 .orga $0066
@@ -2066,7 +1969,7 @@ ColumnsPagingHelper:
 .bank 19
 .org 0
 .incbin "Columns.sms" skip $1c000 read $4000
-
+*/
 .slot 2
 .section "Music data" superfree
 MusicData:
@@ -2082,7 +1985,6 @@ PSGMOD_VIBRATO_TABLES:
 .incbin "player_z80/psgmod.vib"
 .ends
 
-/*
 .bank 22 slot 0
 .org 0
 Sonic:
@@ -2090,190 +1992,162 @@ Sonic:
 
 .org $000c
 .section "Sonic paging helpers 1" overwrite ; We are fitting around the interrupt vectors, we have to not trash what is there
-SonicPagingfffea: ; 6 bytes
-  add a,:Sonic ; 2
-SonicPagingfffea_no_adjustment:
-  ld ($4000),a ; 3
-  ret          ; 1
-SonicPagingffffa: ; 6 bytes
-  add a,:Sonic ; 2
-SonicPagingffffa_no_adjustment:
-  ld ($8000),a ; 3
-  ret          ; 1
-  ; Interrupt vector
-  jp $02d7     ; 000018 C3 D7 02 
-  ; 5b space
-SonicPagingfffede:
-  push af         ; 1
-    ld a,d        ; 1
-    jr +          ; 2
-    nop           ; 1
-  ; Interrupt vector
-  jp $02ed        ; 000020 C3 ED 02 
-  ; 5b space
-+:  ld ($8000),a  ; 3
-    jr +          ; 2
-  ; Interrupt vector
-  jp $02fe        ; 000028 C3 FE 02 
-  ; 13b space
-+:  ld a,e        ; 1
-    ld ($4000),a  ; 3
-  pop af          ; 1
+SonicPageHLFixup: ; 9/12 bytes
+  ; can use a
+  ld a,h          ; 1
+  ld ($8000),a    ; 3
+  ld a,l          ; 1
+-:ld ($4000),a    ; 3
   ret             ; 1
-SonicPagingfffehl:
-  ; Pages are pre-adjusted
-  ; We can trash a
-  ld a,h              ; 1
-  ld ($8000),a        ; 3
-  ld a,l              ; 1
-  jr SonicPagingfffea_no_adjustment ; 2
+.rept 3
+  nop
+.endr
+  jp $02d7 ; original code
+Sonic_fn0405Fix:
+  add a,:Sonic    ; 2
+  jr -            ; 2 - happens to do what I want
+.ends
+
+.org $002b
+.section "Sonic paging helpers 2" overwrite
+SonicPageDEFixup:
+  ; need to protect registers?
+  push hl         ; 1
+    ex de,hl      ; 1
+    call SonicPageHLFixup ; 3
+    ex de,hl      ; 1
+  pop hl          ; 1
+  ret             ; 1
 .ends
 
 .org $00e2
-.section "Post VBlank fixup" overwrite
+.section "Sonic post VBlank fixup" overwrite
 ;    pop    hl              ; 0000E2 E1 
 ;    ld     ($fffe),hl      ; 0000E3 22 FE FF 
 ;    ld     ($d235),hl      ; 0000E6 22 35 D2 
   pop hl
-  call SonicPagingfffehl
+  call SonicPageHLFixup
   ld ($d235),hl
 .ends
 
-.orga $028b
-.section "Mapper initialisation removal, memory blanking at startup" overwrite
-;    ld     a,$80           ; 00028B 3E 80 
-;    ld     ($fffc),a       ; 00028D 32 FC FF 
-;    ld     a,$00           ; 000290 3E 00 
-;    ld     ($fffd),a       ; 000292 32 FD FF 
-;    ld     a,$01           ; 000295 3E 01 
-;    ld     ($fffe),a       ; 000297 32 FE FF 
-;    ld     a,$02           ; 00029A 3E 02 
-;    ld     ($ffff),a       ; 00029C 32 FF FF 
-;    ld     hl,$c000        ; 00029F 21 00 C0 
-;    ld     de,$c001        ; 0002A2 11 01 C0 
-;    ld     bc,$1fef        ; 0002A5 01 EF 1F 
-;    ld     (hl),l          ; 0002A8 75 
-;    ldir                   ; 0002A9 ED B0 
-  ld hl,(:Sonic << 8) + :Sonic + 1 ; 3
-  ld ($d235),hl                    ; 3
-  .dsb 4 $00 ; fill the space
-
+; disable initialisation of other paging regs
+ nopOut $28b 10
+ 
+; Fix memory blanking, stack top
+ patchWord $2a5+1, TopOfStack-$c001
+ 
+.org $0426
+.section "fn0405 page number fix up" overwrite
+; was:
+;    ld     ($fffe),a       ; 000426 32 FE FF    ; Page into that slot
+; ...
+  call Sonic_fn0405Fix
+  ld ($d235),a       ; as original
+  inc a              ; as original
+  ld ($8000),a       ; patched
 .ends
- 
-; Memory blanking at startup, stack location
-;    ld     hl,$c000        ; 00029F 21 00 C0 
-;    ld     de,$c001        ; 0002A2 11 01 C0 
-;    ld     bc,$1fef        ; 0002A5 01 EF 1F 
-;    ld     (hl),l          ; 0002A8 75 
-;    ldir                   ; 0002A9 ED B0 
-;    ld     sp,hl           ; 0002AB F9 
- patchWord $02a5+1, TopOfStack - $c000 - 1
- 
-.orga $4ea
-.section "Paging via de fixup" overwrite
-;    pop    de              ; 0004EA D1 
-;    ld     ($d235),de      ; 0004EB ED 53 35 D2 
+
+.org $04ef
+.section "Page from de fixup" overwrite
 ;    ld     ($fffe),de      ; 0004EF ED 53 FE FF 
-  pop de ; not sure if I need to leave it there... I think it's pre-adjusted
-  ld ($d235),de
-  call SonicPagingfffede
-  nop ; to fill out the space
+  call SonicPageDEFixup
 .ends
 
-.macro M_SonicPagingfffea
+.macro m_Sonic_fffe_a
+;    ld     a,$08           ; 00012D 3E 08 
+;    ld     ($fffe),a       ; 00012F 32 FE FF 
 .orga \1
-.section "M_SonicPagingfffea\@" overwrite
-call SonicPagingfffea
-.ends
-.endm
-.macro M_SonicPagingffffa
-.orga \1
-.section "M_SonicPagingfffffa\@" overwrite
-call SonicPagingffffa
-.ends
-.endm
-.macro M_SonicPagingffffa_no_adjustment
-.orga \1
-.section "M_SonicPagingfffffa_no_adjustment\@" overwrite
-call SonicPagingffffa_no_adjustment
+.section "m_Sonic_fffe_a_\@_" overwrite
+.if nargs == 2
+  ld a,\2 + :Sonic
+.endif
+  ld ($4000),a
 .ends
 .endm
 
-
+.macro m_Sonic_ffff_a
+;    ld     a,$09           ; 000135 3E 09 
+;    ld     ($ffff),a       ; 000137 32 FF FF 
+.orga \1
+.section "m_Sonic_ffff_a_\@_" overwrite
+.if nargs == 2
+  ld a,\2 + :Sonic
+.endif
+  ld ($8000),a
+.ends
+.endm
 
 ; Generated...
- M_SonicPagingfffea $000C5
- M_SonicPagingfffea $0012F
- M_SonicPagingffffa $00137
- M_SonicPagingfffea $00146
- M_SonicPagingffffa $0014E
- M_SonicPagingfffea $00176
- M_SonicPagingffffa $0017E
- M_SonicPagingfffea $001A7
- M_SonicPagingffffa $001AF
- M_SonicPagingfffea $00297
- M_SonicPagingffffa $0029C
- M_SonicPagingfffea $002DB
- M_SonicPagingfffea $002E8
- M_SonicPagingfffea $002F0
- M_SonicPagingfffea $002F9
- M_SonicPagingfffea $00302
- M_SonicPagingfffea $0030C
- M_SonicPagingfffea $003BC
- M_SonicPagingffffa_no_adjustment $003C3
- M_SonicPagingfffea $003FC
- M_SonicPagingffffa $00400
- M_SonicPagingfffea $00426
- M_SonicPagingffffa_no_adjustment $0042D
- M_SonicPagingfffea $006C5
- M_SonicPagingffffa $006CD
- M_SonicPagingfffea $00969
- M_SonicPagingffffa $00971
- M_SonicPagingfffea $00A42
- M_SonicPagingffffa $00A4A
- M_SonicPagingfffea $00ABE
- M_SonicPagingffffa $00AC6
- M_SonicPagingfffea $00B70
- M_SonicPagingffffa $00B78
- M_SonicPagingfffea $00C20
- M_SonicPagingfffea $00C4D
- M_SonicPagingfffea $00CAC
- M_SonicPagingfffea $00D0E
- M_SonicPagingfffea $012AE
- M_SonicPagingfffea $0141E
- M_SonicPagingfffea $0158D
- M_SonicPagingfffea $01CEF
- M_SonicPagingfffea $01D57
- M_SonicPagingfffea $01D81
- M_SonicPagingffffa $01D89
- M_SonicPagingfffea $01DB7
- M_SonicPagingfffea $01E52
- M_SonicPagingffffa $01E5A
- M_SonicPagingfffea $01EB3
- M_SonicPagingfffea $01ECE
- M_SonicPagingfffea $01F0E
- M_SonicPagingffffa $01F16
- M_SonicPagingfffea $020BA
- M_SonicPagingfffea $0221E
- M_SonicPagingffffa $02226
- M_SonicPagingfffea $02230
- M_SonicPagingffffa $02238
- M_SonicPagingfffea $0227F
- M_SonicPagingffffa $02287
- M_SonicPagingfffea $022BF
- M_SonicPagingffffa $022C7
- M_SonicPagingfffea $022E2
- M_SonicPagingfffea $025B6
- M_SonicPagingfffea $025DD
- M_SonicPagingfffea $02677
- M_SonicPagingfffea $026C3
+ m_Sonic_fffe_a $000C3, $03
+ m_Sonic_fffe_a $0012D, $08
+ m_Sonic_ffff_a $00135, $09
+ m_Sonic_fffe_a $00144, $01
+ m_Sonic_ffff_a $0014C, $02
+ m_Sonic_fffe_a $00174, $01
+ m_Sonic_ffff_a $0017C, $02
+ m_Sonic_fffe_a $001A5, $01
+ m_Sonic_ffff_a $001AD, $02
+ m_Sonic_fffe_a $00295, $01
+ m_Sonic_ffff_a $0029A, $02
+ m_Sonic_fffe_a $002D9, $03
+ m_Sonic_fffe_a $002E8
+ m_Sonic_fffe_a $002EE, $03
+ m_Sonic_fffe_a $002F9
+ m_Sonic_fffe_a $00300, $03
+ m_Sonic_fffe_a $0030C
+ m_Sonic_fffe_a $003BC
+ m_Sonic_ffff_a $003C3
+ m_Sonic_fffe_a $003FC
+ m_Sonic_ffff_a $00400
+ m_Sonic_fffe_a $006C3, $04
+ m_Sonic_ffff_a $006CB, $05
+ m_Sonic_fffe_a $00967, $04
+ m_Sonic_ffff_a $0096F, $05
+ m_Sonic_fffe_a $00A40, $01
+ m_Sonic_ffff_a $00A48, $02
+ m_Sonic_fffe_a $00ABC, $01
+ m_Sonic_ffff_a $00AC4, $02
+ m_Sonic_fffe_a $00B6E, $01
+ m_Sonic_ffff_a $00B76, $02
+ m_Sonic_fffe_a $00C1E, $05
+ m_Sonic_fffe_a $00C4D
+ m_Sonic_fffe_a $00CAA, $05
+ m_Sonic_fffe_a $00D0C, $05
+ m_Sonic_fffe_a $012AC, $05
+ m_Sonic_fffe_a $0141C, $05
+ m_Sonic_fffe_a $0158B, $05
+ m_Sonic_fffe_a $01CED, $05
+ m_Sonic_fffe_a $01D55, $0B
+ m_Sonic_fffe_a $01D7F, $01
+ m_Sonic_ffff_a $01D87, $02
+ m_Sonic_fffe_a $01DB5, $0B
+ m_Sonic_fffe_a $01E50, $01
+ m_Sonic_ffff_a $01E58, $02
+ m_Sonic_fffe_a $01EB1, $0B
+ m_Sonic_fffe_a $01ECC, $03
+ m_Sonic_fffe_a $01F0C, $01
+ m_Sonic_ffff_a $01F14, $02
+ m_Sonic_fffe_a $020B8, $03
+ m_Sonic_fffe_a $0221C, $06
+ m_Sonic_ffff_a $02224, $07
+ m_Sonic_fffe_a $0222E, $05
+ m_Sonic_ffff_a $02236, $06
+ m_Sonic_fffe_a $0227D, $01
+ m_Sonic_ffff_a $02285, $02
+ m_Sonic_fffe_a $022BD, $01
+ m_Sonic_ffff_a $022C5, $02
+ m_Sonic_fffe_a $022E0, $05
+ m_Sonic_fffe_a $025B4, $05
+ m_Sonic_fffe_a $025DB, $01
+ m_Sonic_fffe_a $02675, $05
+ m_Sonic_fffe_a $026C1, $05
 
 .bank 23 slot 1
 .org 0
 .incbin "Sonic The Hedgehog.sms" skip $04000 read $4000
 
- M_SonicPagingffffa $049E9
- M_SonicPagingffffa $04A20
+ m_Sonic_ffff_a $049E7, $0F
+ m_Sonic_ffff_a $04A1E, $02
 
 .bank 24 slot 2
 .org 0
@@ -2330,4 +2204,3 @@ call SonicPagingffffa_no_adjustment
 .bank 37
 .org 0
 .incbin "Sonic The Hedgehog.sms" skip $3c000 read $4000
-; */

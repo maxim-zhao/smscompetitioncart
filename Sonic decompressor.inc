@@ -19,15 +19,15 @@ Sonic1TileLoader_ArtData dw
 Sonic1TileLoader_Decompress:
 ; Arguments:
 ; hl = data address
-; VDP write address should be already set
+; de = VDP write address
 ; Uses af,bc,de,bc',de',hl'
-; Note: this has been slightly modified from what is found in Sonic 1, for size and speed
+; Note: this has been slightly modified from what is found in Sonic 1, for size and speed, plus it sets the VRAM address internally.
 
 ; See http://info.sonicretro.org/SCHG:Sonic_the_Hedgehog_%288-bit%29#Header for details on the format
 
-ld c,$bf
-out (c),e
-out (c),d
+    ld c,$bf
+    out (c),e
+    out (c),d
 
     ld (Sonic1TileLoader_StartOfData),hl
     
