@@ -972,16 +972,41 @@ SonicStart:
 .define SonicLivesCounter $d246 ; Hex
 .define SonicTimeMinutes $d2ce ; 0-9
 .define SonicTimeSeconds $d2cf ; BCD
-  
+.define SonicLevelNumber $d23e ; Hex
+.define SonicStateByte $d206 ; ?
+
 SonicFrameHandler:
   ; All registers are free to use, we're in the VBlank handler 
   call CheckForReset
+  
+  ; Check the game state
+  ld a,(SonicStateByte)
+  and $08
+  jr z,+
+  
+  ; We're in the game (?)
+  ; Decrement timer
+  ld hl,(FrameCounter)
+  dec hl
+  ld (FrameCounter),hl
+  ld a,h
+  or l
+  jp z,TimeUp
+  
+  ; We can't detect 100 rings in here... we catch it in the game?
 
-  ; Return to game
++:; Return to game
   ld a,:Sonic
   ld hl,SonicReturnAddress
   push hl
   jp JumpBack
+  
+SonicEnd:
+  ; Clear things up
+  call InitialiseSystem
+  ld sp,TopOfStack
+
+-:jr -
 
 .ends
 
@@ -2009,37 +2034,71 @@ Sonic:
 .incbin "Sonic The Hedgehog.sms" skip $00000 read $4000
 
 ; Game hacks
+; Disable ring counter reset on level start
+ nopOut $2156 3
 ; Disable losing rings when hurt
  nopOut $3645 3
+; Disable ring countdown at level end, plus the rest of the score adding
+ nopOut $1692 9
+ nopOut $16bf 3
 
-.org $000c
-.section "Sonic paging helpers 1" overwrite ; We are fitting around the interrupt vectors, we have to not trash what is there
-SonicPageHLFixup: ; 9/12 bytes
-  ; can use a
-  ld a,h          ; 1
-  ld ($8000),a    ; 3
-  ld a,l          ; 1
--:ld ($4000),a    ; 3
-  ret             ; 1
-.rept 3
-  nop
-.endr
-  jp $02d7 ; original code
-Sonic_fn0405Fix:
-  add a,:Sonic    ; 2
-  jr -            ; 2 - happens to do what I want
+.orga $0066
+.section "Sonic pause remover" overwrite
+  retn
 .ends
 
-.org $002b
-.section "Sonic paging helpers 2" overwrite
-SonicPageDEFixup:
-  ; need to protect registers?
-  push hl         ; 1
-    ex de,hl      ; 1
-    call SonicPageHLFixup ; 3
-    ex de,hl      ; 1
-  pop hl          ; 1
+.orga $1328
+.section "Sonic: disable title screen timeout" overwrite
+; Was:
+;    and    a               ; 001328 A7 
+;    jr     z,$1350         ; 001329 28 25 ; Zero counter means end
+  jp SonicAttractModeDisabler
+.ends
+
+.org $003b
+.section "Sonic paging helpers 1" overwrite ; We are overwriting some secret text, we have 43 bytes of space
+SonicPageHLFixup: ; 9 bytes
+  ; can use a
+  ld a,h          ; 1
+  ld (Slot2Control),a ; 3
+  ld a,l          ; 1
+-:ld (Slot1Control),a ; 3
   ret             ; 1
+
+Sonic_fn0405Fix:  ; 4 bytes
+  add a,:Sonic    ; 2
+  jr -            ; 2 - happens to do what I need
+
+SonicPageDEFixup: ; 7 bytes
+  ; seems safe to use a
+  ld a,e          ; 1
+  ld (Slot2Control),a ; 3
+  ld a,d          ; 1
+  jr -            ; 2 - happens to do what I need
+  
+SonicAttractModeDisabler: ; 13 bytes
+  ; check a
+  or a            ; 1
+  jp nz,$132b     ; 3 - back to where we hooked from
+  ; set behaviour back to start
+  ld hl,$1372     ; 3
+  ld ($d210), hl  ; 3
+  jp $131f        ; 3 - back to the behaviour loader
+  
+SonicLevelChooser: ; 6 bytes
+  ;  0- 2 = Green Hill
+  ;  3- 5 = Bridge
+  ;  6- 8 = Jungle
+  ;  9-11 = Labyrinth
+  ; 12-14 = Scrap Brain
+  ; 15-17 = Sky Base
+  ;    18 = Ending
+  ; It's hard to get to the special stages this way, the game protects against it..?
+  ld a,0          ; 2
+  ld ($d23e),a    ; 3
+  ret             ; 1
+  
+  ; 4 bytes left
 .ends
 
 .org $00db
@@ -2050,7 +2109,7 @@ SonicPageDEFixup:
   jp JumpOut
 .define SonicReturnAddress $00e2
 .ends
-  
+
 .org $00e2
 .section "Sonic VBlank paging fixup" overwrite
 ;    pop    hl              ; 0000E2 E1 
@@ -2084,6 +2143,27 @@ SonicPageDEFixup:
   call SonicPageDEFixup
 .ends
 
+.org $1c5d
+.section "Level select" overwrite
+;    xor    a               ; 001C5D AF 
+;    ld     ($d23e),a       ; 001C5E 32 3E D2 ; Level number
+  call SonicLevelChooser
+  xor a
+.ends
+
+.org $39C1
+.section "100 rings" overwrite
+;    cp     $a0             ; 0039BD FE A0     Over 99?
+;    jr     c,$39d1         ; 0039BF 38 10 
+;    sub    $a0             ; 0039C1 D6 A0     Wrap
+;    ld     ($d2aa),a       ; 0039C3 32 AA D2  
+;    ld     a,($d246)       ; 0039C6 3A 46 D2  Increment lives
+; ...
+  ld hl,SonicEnd
+  ld (JumpOutAddress), hl
+  jp JumpOut
+.ends
+
 .macro m_Sonic_fffe_a
 ;    ld     a,$08           ; 00012D 3E 08 
 ;    ld     ($fffe),a       ; 00012F 32 FE FF 
@@ -2092,7 +2172,7 @@ SonicPageDEFixup:
 .if nargs == 2
   ld a,\2 + :Sonic
 .endif
-  ld ($4000),a
+  ld (Slot1Control),a
 .ends
 .endm
 
@@ -2104,7 +2184,7 @@ SonicPageDEFixup:
 .if nargs == 2
   ld a,\2 + :Sonic
 .endif
-  ld ($8000),a
+  ld (Slot2Control),a
 .ends
 .endm
 
@@ -2179,6 +2259,12 @@ SonicPageDEFixup:
 
  m_Sonic_ffff_a $049E7, $0F
  m_Sonic_ffff_a $04A1E, $02
+ 
+ ; Infinite lives
+ nopOut $5464 1
+;    ld     hl,$d246        ; 005461 21 46 D2 
+;    dec    (hl)            ; 005464 35 
+ 
 
 .bank 24 slot 2
 .org 0
