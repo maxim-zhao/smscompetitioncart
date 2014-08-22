@@ -48,3 +48,7 @@ sonic.asm
 *.PuCrunch
 *.aPLib
 temp.txt
+*.o
+*.o
+*.o
+linkfile
