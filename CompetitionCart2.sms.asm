@@ -1,18 +1,16 @@
 .include "Common.inc"
 
-;.define TEXT_MODE
-
-.define TILE_COMPRESSION "Sonic" ; could be PSG, PS, raw, aPLib, PuCrunch, Sonic
+.define TILE_COMPRESSION "aPLib" ; could be PSG, PS, raw, aPLib, PuCrunch, Sonic
 
 ; Benchmarking the compression of our large tiles blob...
 ;
 ; Compression  Bytes  Ratio  Load time (cycles)  Ratio
-; None          9888   100%              494435   100%
-; PScompr       8472    86%             1354926   274%
-; Sonic 1       5616    57%             1026969   207%
-; PSGcompr      5116    52%             1600820   324%
-; PuCrunch      4109    42$             3475587   703%
-; aPLib         4058    41%             3640882   736%
+; None         10400   100%              160068   100%
+; PScompr       8881    85%             1354926   846%
+; Sonic 1       5888    57%             1026969   642%
+; PSGcompr      5388    52%             1600820  1000%
+; PuCrunch      4226    41%             3475587  2171%
+; aPLib         4170    40%             3640882  2275%
 ;
 ; Decompressor sizes are not included in the byte counts.
 
@@ -33,6 +31,8 @@ jp start
   push bc
   push hl
     in a,(Port_VDPStatus)
+    call UpdatePalette
+    call HandlePaletteFade
     call CheckForReset
     call PSGMOD_Play
   pop hl
@@ -79,7 +79,7 @@ start:
   call InitialiseSystem
   call TitleScreen
 
-  jp SonicStart;AKMWStart
+  jp SonicStart
   
 .ends
 
@@ -102,6 +102,16 @@ InitialiseSystem:
   ld b,VdpDataEnd-VdpData
   ld c,Port_VDPAddress
   otir
+  
+  ; Blacken palette
+  ld a,$00
+  out (Port_VDPAddress),a
+  ld a,$c0
+  out (Port_VDPAddress),a
+  xor a
+  ld b,32
+-:out (Port_VDPData),a
+  djnz -
 
   ; Clear VRAM
   ld a,$00
@@ -124,38 +134,19 @@ InitialiseSystem:
   out (Port_VDPAddress),a
   ld a,208
   out (Port_VDPData),a
-
-  ; Load palette
-  ld a,$00
-  out (Port_VDPAddress),a
-  ld a,$c0
-  out (Port_VDPAddress),a
-  ; 2. Output colour data
+  
+  ; Load palette, blacken "current palette"
   ld hl,PaletteData
-  ld b,(PaletteDataEnd-PaletteData)
-  ld c,Port_VDPData
-  otir
-
-.ifdef TEXT_MODE
-  ; Load font
-  ld a,$00
-  out (Port_VDPAddress),a
-  ld a,$40
-  out (Port_VDPAddress),a
-  ld hl,FontData
-  ld bc,FontDataEnd-FontData
--:ld a,(hl)        ; Get data byte
-  out (Port_VDPData),a
+  ld de,TargetPalette
+  ld bc,32
+  ldir
+  ld hl,CurrentPalette
+  ld de,CurrentPalette+1
   xor a
-  out (Port_VDPData),a
-  out (Port_VDPData),a
-  out (Port_VDPData),a
-  inc hl
-  dec bc
-  ld a,b
-  or c
-  jr nz,-
-.else
+  ld (hl),a
+  ld bc,31
+  ldir
+
   ; Load graphics
   ld a,:Tiles
   ld ($8000),a
@@ -163,7 +154,7 @@ InitialiseSystem:
   ld hl,Tiles
   ld de,$4000
   ld bc,TilesSize
-  call raw_decompress ; TODO
+  call raw_decompress
 .endif
 .if TILE_COMPRESSION == "PSG"
   ld ix,Tiles
@@ -190,7 +181,6 @@ InitialiseSystem:
   ld de,$4000
   call Sonic1TileLoader_Decompress
 .endif
-.endif
   
   ; Start music
   ld a,:MusicData
@@ -201,27 +191,16 @@ InitialiseSystem:
   ret
 
 PaletteData:
-.ifdef TEXT_MODE
-.db $00,$3f,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ; Black, White
-.else
 .db $00 $10 $34 $25 $35 $39 $2A $3A $2B $0F $1F $3F 0 0 0 0
 .dsb 16 $35 ; background
-.endif
 PaletteDataEnd:
 
 ; VDP initialisation data
 VdpData:
 .db $04,$80,$04,$81,$ff,$82,$ff,$85,$ff,$86,$ff,$87,$00,$88,$00,$89,$ff,$8a
 VdpDataEnd:
+.ends
 
-.ends
-.ifdef TEXT_MODE
-.section "Font data" free
-FontData:
-.include "BBC Micro font.inc"
-FontDataEnd:
-.ends
-.else
 .slot 2
 .section "Graphics data" superfree
 Tiles:
@@ -243,10 +222,20 @@ Tiles:
 .if TILE_COMPRESSION == "Sonic"
 .incbin "Tiles.soniccompr"
 .endif
+
 .ends
 .section "Tilemaps" superfree
 Tilemaps:
 .incbin "Tilemaps.bin" skip 32*2*4 ; top 4 rows are digits
+.enum 0 asc export
+Tilemap_TitleScreen db
+Tilemap_Sonic       db
+Tilemap_AKMW        db
+Tilemap_HangOn      db
+Tilemap_Columns     db
+Tilemap_TimeUp      db
+Tilemap_Results     db
+.ende
 .ends
 .slot 0
 
@@ -256,19 +245,29 @@ raw_decompress:
   ; hl = src
   ; de = dest
   ; bc = count
+  ; save c
+  ld ixl,c
   ; Set VRAM address
-  ld a,e
-  out ($bf),a
-  ld a,d
-  out ($bf),a
-  ; Output
--:ld a,(hl)
-  inc hl
-  out ($be),a
-  dec bc
+  ld c,Port_VDPAddress
+  out (c),e
+  out (c),d
+  ld c,Port_VDPData
+  ; Check for bc<256
   ld a,b
-  or c
-  jr nz,-
+  or a
+  jr z,+
+  ; Output 256 byte chunks
+-:call outiblock
+  djnz -
+  ; Output remaining bits
++:ld ixh,>outiblock
+  jp (ix) ; and ret
+.ends
+.section "outi block" align 256
+outiblock:
+.rept 256
+  outi
+.endr
   ret
 .ends
 .endif
@@ -288,7 +287,6 @@ raw_decompress:
 .endif
 .if TILE_COMPRESSION == "Sonic"
 .include "Sonic decompressor.inc"
-.endif
 .endif
 
 .section "Maths helpers" free
@@ -401,23 +399,6 @@ VRAMToDE:
   out (Port_VDPAddress),a
   ret
 
-.ifdef TEXT_MODE
-WriteText:
-  ; Args:
-  ; hl = text to write
-  ; de = VRAM address to write to (with high bit set)
-  call VRAMToDE
--:ld a,(hl)
-  or a
-  ret z
-  sub ' '
-  out (Port_VDPData),a
-  xor a
-  out (Port_VDPData),a
-  inc hl
-  jr -
-.endif
-
 .macro SHOW_ZEROES
 .ifdef TEXT_MODE
   ld d,0
@@ -447,12 +428,8 @@ WriteNumber16:
   ; hl = number to display
   ; de = VRAM address of the most significant digit
   ; Trashes: bc, hl', bc', a
-.ifdef TEXT_MODE
-  call VRAMToDE ; Set VRAM address now
-.else
   xor a
   ld (NumberTileIndicesOffset),a
-.endif
 
   push hl
   exx
@@ -467,12 +444,8 @@ WriteNumberSevenDigits:
   ; bchl = 32-bit number, should be no larger than 9999999 else you get your number modulo $ffffff
   ; de = VRAM address of the most significant digit
   ; Trashes: af, bc, de, hl, bc', hl'
-.ifdef TEXT_MODE
-  call VRAMToDE ; Set VRAM address now
-.else
   xor a
   ld (NumberTileIndicesOffset),a
-.endif
 
   ; Shuffle so hl = high word, hl' = low word
   push hl
@@ -490,12 +463,8 @@ WriteNumber32:
   ; bchl = 32-bit number
   ; de = VRAM address of the most significant digit
   ; Trashes: af, bc, de, hl, bc', hl'
-.ifdef TEXT_MODE
-  call VRAMToDE ; Set VRAM address now
-.else
   ld a,OFFSET_PINK_DIGITS
   ld (NumberTileIndicesOffset),a
-.endif
 
   ; Shuffle so hl = high word, hl' = low word
   push hl
@@ -548,22 +517,6 @@ WriteDigit:
   sbc hl,bc   ; high word
   dec a
 
-.ifdef TEXT_MODE
-  jr nz,_writeNonZero
-  ; Write spaces for leading zeroes
-  add a,d
-  jr _write
-
-_writeNonZero:
-  ld d,0    ; Disable zero to space correction
-  ; fall through
-_write:
-  add a,$10    ; Convert to tile index - $10 = index of '0'
-  out (Port_VDPData),a
-  xor a
-  out (Port_VDPData),a
-  ret
-.else
   ; Graphical mode number display
   ; Always shows leading zeroes
   ; Look up in table
@@ -614,16 +567,12 @@ _NumberTileIndices:
 ; Blue background
 .db 1,9,2,10,3,11,4,12,5,13,6,14,7,15,8,16,1,17,1,18
 .define OFFSET_PINK_DIGITS 18
-.endif
 
 ShowTime:
   ; Args:
   ; hl = time in frames
   ; de = VRAM address of the most significant digit
   ; Trashes: bc, hl', bc', a
-.ifdef TEXT_MODE
-  call VRAMToDE
-.endif
   ld hl,(FrameCounter)
   ; Frames to seconds
   ld b,50
@@ -635,15 +584,7 @@ ShowTime:
   push af
     ld a,l
     call WriteNumber2Digits
-.ifdef TEXT_MODE
-    ; Colon
-    ld a,$1a ; ':'
-    out (Port_VDPData),a
-    xor a
-    out (Port_VDPData),a
-.else
-    ; TODO
-.endif
+    ; TODO: colon
   pop af
   ; Seconds
   call WriteNumber2Digits
@@ -691,7 +632,6 @@ WaitForButton:
   ret
 .ends
 
-.ifndef TEXT_MODE
 .section "Load a screen" free
 LoadScreenImpl:
   ; Hacky :P
@@ -708,36 +648,12 @@ LoadScreenImpl:
   otir
   otir
   otir
-/*
-  ; slow
-  ld bc, 32*24*2
--:ld a,(hl)
-  inc hl
-  out (Port_VDPData),a
-  ; Slow down
-  push bc
-    ld b,0
- --:push ix
-    pop ix
-    djnz --
-  pop bc
-  dec bc
-  ld a,b
-  or c
-  jr nz,-
-*/
   ret
 .ends
-.endif
 
 .section "Title screen" free
 TitleScreen:
-.ifdef TEXT_MODE
-  ld hl,_text
-  LocationToDE 0, 2
-  call WriteText
-.else
-  LoadScreen 0
+  LoadScreen Tilemap_TitleScreen
 
 /*  
   ; Testing
@@ -757,42 +673,12 @@ TitleScreen:
 */
 
   call ScreenOn
+  call FadeInFullPalette
   call WaitForButton
+  call FadeOutFullPalette
   call ScreenOff
 
-  LoadScreen 1
-.endif
-
-  call ScreenOn
-  call WaitForButton
-  call ScreenOff
   ret
-
-.ifdef TEXT_MODE
-_text:
-; Hugely wasteful but easy to write...
-;    01234567890123456789012345678901
-.db "     Sega8bit.com/SMS Power!    "
-.db "           meetup 2014          "
-.db "                                "
-.db "           at pub/zoo           "
-.db "       on August 2nd 2013       "
-.db "                                "
-.db "        Competition cart!       "
-.db "                                "
-.db "                                "
-.db " Game 1:                        "
-.db "   Alex Kidd in Miracle World   "
-.db "                                "
-.db " Objective: Collect as much     "
-.db "   money as you can in level 1, "
-.db "   but be quick!                "
-.db "                                "
-.db " Controls: 1 = jump             "
-.db "           2 = punch            "
-.db "                                "
-.db "        Press 1 to start", 0
-.endif
 .ends
 
 .section "Game swapping helpers" free
@@ -859,13 +745,12 @@ TimeUp:
   call InitialiseSystem
   ld sp,TopOfStack
   
-.ifndef TEXT_MODE
-  LoadScreen 4 ; Time up
-
+  LoadScreen Tilemap_TimeUp
   call ScreenOn
+  call FadeInFullPalette
   call WaitForButton
+  call FadeOutFullPalette
   call ScreenOff
-.endif
 
 FinalResults:
   
@@ -878,44 +763,25 @@ FinalResults:
   dec a
   call z,ColumnsGetScore
 
-.ifdef TEXT_MODE
- ; Display stuff
-  ld hl,_text
-  LocationToDE 0, 2
-  call WriteText
-.else
-  LoadScreen 5 ; Results
-.endif
+  LoadScreen Tilemap_Results
 
   ; Draw stuff. We retrieve the scores from RAM and scale them up as necessary.
   ld a,(AKMWMoneyDividedBy10)
   ld de,10
   call DETimesAToBCHL
-.ifdef TEXT_MODE
-  LocationToDE 15, 7
-.else
   LocationToDE 5, 4
-.endif
   call WriteNumberSevenDigits
 
   ld de,(HangOnScoreDividedBy10)
   ld a,10
   call DETimesAToBCHL
-.ifdef TEXT_MODE
-  LocationToDE 15, 10
-.else
   LocationToDE 5, 9
-.endif
   call WriteNumberSevenDigits
 
   ld de,(ColumnsScoreDividedBy10)
   ld a,10
   call DETimesAToBCHL
-.ifdef TEXT_MODE
-  LocationToDE 15, 13
-.else
   LocationToDE 5, 14
-.endif
   call WriteNumberSevenDigits
 
   ; Calculate the total score
@@ -925,20 +791,16 @@ FinalResults:
   call DETimesAToBCHL
   push bc
     push hl
-.ifndef TEXT_MODE
       LocationToDE 20, 4
       call WriteNumberSevenDigits
-.endif
       ; 2. Hang On
       ld de,(HangOnScoreDividedBy10) ; up to about 8000
       ld a,10
       call DETimesAToBCHL ; may reach into c?
       push bc
         push hl
-.ifndef TEXT_MODE
           LocationToDE 20, 9
           call WriteNumberSevenDigits
-.endif
           ; 3. Columns x30
           ld de,(ColumnsScoreDividedBy10) ; may be quite high?
           ld a,150 ; can't do 300 in a byte!
@@ -952,14 +814,12 @@ FinalResults:
             ld b,h
             ld c,l
           ex de,hl
-.ifndef TEXT_MODE
           push bc
           push hl
             LocationToDE 20, 14
             call WriteNumberSevenDigits
           pop hl
           pop bc
-.endif
           ; Unwind and add up...
         pop de
         call AddDEToBCHLLow
@@ -971,41 +831,15 @@ FinalResults:
   call AddDEToBCHLHigh
     
   ; Done! Now to display it...
-.ifdef TEXT_MODE
-  LocationToDE 12, 17
-.else
   LocationToDE 17, 19
-.endif
   call WriteNumber32
 
   call ScreenOn
+  call FadeInFullPalette
   call WaitForButton
+  call FadeOutFullPalette
   call ScreenOff
   jp 0
-
-.ifdef TEXT_MODE
-_text:
-.db "            GAME OVER           "
-.db "                                "
-.db " Your score:                    "
-.db "                                "
-.db " Alex Kidd in Miracle World:    "
-.db "         Money:  _____ x  128   "
-.db "                                "
-.db " Hang On:                       "
-.db "         Score:  _____ x    1   "
-.db "                                "
-.db " Columns:                       "
-.db "         Score:  _____ x   32   "
-.db "                                "
-.db " Total score:                   "
-.db "                                "
-.db "            __________          "
-.db "                                "
-.db "                                "
-.db "                                "
-.db "       Press 1 to restart", 0
-.endif
 .ends
 
 .section "Mod2PSG2" free
@@ -1015,6 +849,134 @@ _text:
 .include "player_z80/psgmod.inc"
 .include "player_z80/psgmod.asm"
 .ends
+
+.section "Palette fading" free
+; This is lifted from Phantasy Star.
+; Call FadeInFullPalette and FadeOutFullPalette to initiate a palette fade. 
+; These rely on HandlePaletteFade being called in the VBlank, and won't return
+; until the fade is complete.
+FadeInFullPalette:
+  ld hl,$2089
+  ld (PaletteFadeControl),hl ; PaletteFadeControl = fade in/counter=9; PaletteSize=32
+  jr _DoFade
+
+FadeOutFullPalette:
+  ld hl,$2009
+  ld (PaletteFadeControl),hl ; PaletteFadeControl = fade out/counter=9; PaletteSize=32
+  ; fall through
+
+_DoFade:
+  halt
+  ld a,(PaletteFadeControl)       ; wait for palette to fade out
+  or a
+  jp nz,_DoFade
+  ret
+
+UpdatePalette:
+  ; Copy palette from RAM to VRAM
+  ld c,Port_VDPAddress
+  ld a,0
+  out (c),a
+  ld a,$c0
+  out (c),a
+  ld hl,CurrentPalette
+  ld c,Port_VDPData
+.rept 32
+  outi
+.endr
+  ret
+
+HandlePaletteFade:
+; stolen from Phantasy Star
+; must run every VBlank
+; Main function body only runs every 4 calls (using PaletteFadeFrameCounter as a counter)
+; Checks PaletteFadeControl - bit 7 = fade in, rest = counter
+; PaletteSize tells it how many palette entries to fade
+; TargetPalette and ActualPalette are referred to
+    ld hl,PaletteFadeFrameCounter ; Decrement PaletteFadeFrameCounter
+    dec (hl)
+    ret p              ; return if >=0
+    ld (hl),3          ; otherwise set to 3 and continue (so only do this part every 4 calls)
+    ld hl,PaletteFadeControl ; Check PaletteFadeControl
+    ld a,(hl)
+    bit 7,a            ; if bit 7 is set
+    jp nz,_FadeIn      ; then fade in
+    or a               ; If PaletteFadeControl==0
+    ret z              ; then return
+    dec (hl)           ; Otherwise, decrement PaletteFadeControl
+    inc hl
+    ld b,(hl)          ; PaletteSize
+    ld hl,CurrentPalette
+  -:call _FadeOut      ; process PaletteSize bytes from ActualPalette
+    inc hl
+    djnz -
+    ret
+
+FadeOutPaletteEntryAtHL:
+_FadeOut:
+    ld a,(hl)
+    or a
+    ret z              ; zero = black = no fade to do
+
+    and %11<<0         ; check red
+    jr z,+
+    dec (hl)           ; If non-zero, decrement
+    ret
+
+  +:ld a,(hl)
+    and %11<<2         ; check green
+    jr z,+
+    ld a,(hl)
+    sub 1<<2           ; If non-zero, decrement
+    ld (hl),a
+    ret
+
+  +:ld a,(hl)
+    and %11<<4         ; check blue
+    ret z
+    sub 1<<4            ; If non-zero, decrement
+    ld (hl),a
+    ret
+
+_FadeIn:
+    cp $80             ; Is only bit 7 set?
+    jr nz,+            ; If not, handle that
+    ld (hl),$00        ; Otherwise, zero it (PaletteFadeControl)
+    ret
+  +:dec (hl)           ; Decrement it (PaletteFadeControl)
+    inc hl
+    ld b,(hl)          ; PaletteSize
+    ld hl,TargetPalette
+    ld de,CurrentPalette
+  -:call _FadePaletteEntry ; fade PaletteSize bytes from ActualPalette
+    inc hl
+    inc de
+    djnz -
+    ret
+
+_FadePaletteEntry:
+    ld a,(de)          ; If (de)==(hl) then leave it
+    cp (hl)
+    ret z
+    add a,%00010000    ; increment blue
+    cp (hl)
+    jr z,+
+    jr nc,++           ; if it's too far then try green
+  +:ld (de),a          ; else save that
+    ret
+ ++:ld a,(de)
+    add a,%00000100    ; increment green
+    cp (hl)
+    jr z,+
+    jr nc,++           ; if it's too far then try red
+  +:ld (de),a          ; else save that
+    ret
+ ++:ex de,hl
+    inc (hl)           ; increment red
+    ex de,hl
+    ret
+.ends
+
 
 .bank 1 slot 1
 .orga $7fe0
@@ -1026,11 +988,6 @@ _text:
 .dw $ef36, $10000 - $ef36 ; fake checksum - must be non-zero in LSB
 .dsb 6 $00 ; unused bytes - must be zero
 .ends
-
-; The games
-
-; We have to split them into chunks manually to get the bank numbers to assemble correctly.
-; Macros don't work as the offsets exceed 16 bits and WLA DX doesn't like that.
 
 .slot 2
 .section "Music data" superfree

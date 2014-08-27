@@ -36,14 +36,19 @@ TopOfStack               db ; Rest of space is for games to use, they need to ha
 ; Note that we should grab any game state before using any of this...
 .enum $c000 asc export
 Port3EValue               db
-GameLoaderRAMAddress      dsb 255
-PSGMOD_START_ADDRESS      dsb 256 ; Must be 256-byte aligned...
+GameLoaderRAMAddress      dsb 255 ; Doesn't need all of this - see next line
+PSGMOD_START_ADDRESS      dsb 384 ; Must be 256-byte aligned...
 aPLibMemory               .db ; needs 5
 PucrunchVars              .db ; needs 44
 PSGDecoderBuffer          .db ; needs 34
 Sonic1TileLoaderMemory    .db ; needs 8
 DecompressorBuffer        dsb 44
 NumberTileIndicesOffset   dw ; So I can choose colours
+PaletteFadeControl        db ; Taken from Ohantasy Star...
+PaletteSize               db
+CurrentPalette            dsb 32
+TargetPalette             dsb 32
+PaletteFadeFrameCounter   db
 .ende
 
 
@@ -80,10 +85,10 @@ nop
   ld de, $7800 | ((y * 32 + x) * 2)
 .endm
 
-.macro LoadScreen args index
+.macro LoadScreen
   ld a,:Tilemaps
   ld ($8000),a
-  ld hl, Tilemaps + 32*24*2*index
+  ld hl, Tilemaps + 32*24*2*\1
   call LoadScreenImpl
 .endm
 

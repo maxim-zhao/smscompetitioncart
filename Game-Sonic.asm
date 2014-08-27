@@ -4,8 +4,15 @@
 
 .section "Sonic helpers" free
 SonicStart:
+  LoadScreen Tilemap_Sonic
+  call ScreenOn
+  call FadeInFullPalette
+  call WaitForButton
+  call FadeOutFullPalette
+  call ScreenOff
+
   ; Record the game number
-  xor a
+  ld a,-1 ; no score from this game
   ld (GameNumber),a
   ; Patch in where to go...
   ld hl,SonicFrameHandler
@@ -54,7 +61,7 @@ SonicEnd:
   call InitialiseSystem
   ld sp,TopOfStack
 
--:jr -
+  jp AKMWStart
 
 .ends
 

@@ -12,6 +12,13 @@
 .define HangOnScoreLow $c006
 
 HangOnStart:
+  LoadScreen Tilemap_HangOn
+  call ScreenOn
+  call FadeInFullPalette
+  call WaitForButton
+  call FadeOutFullPalette
+  call ScreenOff
+
   ; Record the game number
   ld a,1
   ld (GameNumber),a
@@ -47,60 +54,11 @@ HangOnEnd:
   call InitialiseSystem
   ld sp,TopOfStack
 
-.ifdef TEXT_MODE
- ; Display stuff
-  ld hl,_text
-  LocationToDE 0, 2
-  call WriteText
-.else
-  LoadScreen 3
-.endif
-
   ; Get the score
   call HangOnGetScore
 
-.ifdef TEXT_MODE
-  ld e,l
-  ld d,h
-  ld a,10
-  call DETimesAToBCHL
-  LocationToDE 22, 4
-  call WriteNumberSevenDigits
-
-  LocationToDE 24, 6
-  call ShowTime
-.endif
-
-  call ScreenOn
-  call WaitForButton
-  call ScreenOff
-
   ; Jump to the next game
   jp ColumnsStart
-  
-.ifdef TEXT_MODE
-_text:
-.db "             Hang On            "
-.db "                                "
-.db "   Score:               _____   "
-.db "                                "
-.db "   Time left:           __:__   "
-.db "                                "
-.db "                                "
-.db "                                "
-.db " Game 3:                        "
-.db "   Columns                      "
-.db "                                "
-.db " Objective: Score as many       "
-.db "   points as you can in the     "
-.db "   remaining time               "
-.db "                                "
-.db " Controls: L/R = move           "
-.db "           D   = drop           "
-.db "           1/2 = swap gems      "
-.db "                                "
-.db "   Press 1 to continue", 0
-.endif
 
 HangOnGetScore:
   ld a,(HangOnScoreHigh) ; High byte x 100

@@ -17,6 +17,13 @@
 .define AKMWScoreLow $c030
 
 AKMWStart:
+  LoadScreen Tilemap_AKMW
+  call ScreenOn
+  call FadeInFullPalette
+  call WaitForButton
+  call FadeOutFullPalette
+  call ScreenOff
+
   ; Record the game number
   xor a
   ld (GameNumber),a
@@ -64,56 +71,11 @@ AKMWEndOfGame:
   call InitialiseSystem
   ld sp,TopOfStack
 
-.ifdef TEXT_MODE
- ; Display stuff
-  ld hl,_text
-  LocationToDE 0, 2
-  call WriteText
-.else
-  LoadScreen 2
-.endif
-
   ; Get the money score
   call AKMWGetScore
 
-.ifdef TEXT_MODE
-  LocationToDE 22, 4
-  call WriteNumberSevenDigits
-  
-  LocationToDE 24, 6
-  call ShowTime
-.endif
-
-  call ScreenOn
-  call WaitForButton
-  call ScreenOff
-
   ; Jump to the next game
   jp HangOnStart
-
-.ifdef TEXT_MODE
-_text:
-.db "   Alex Kidd in Miracle World   "
-.db "                                "
-.db "   Money:               _____   "
-.db "                                "
-.db "   Time left:           __:__   "
-.db "                                "
-.db "                                "
-.db "                                "
-.db " Game 2:                        "
-.db "   Hang On                      "
-.db "                                "
-.db " Objective: Get a high score    "
-.db "   on stage 1... but time is    "
-.db "   running out...               "
-.db "                                "
-.db " Controls: 2 = accelerator      "
-.db "           U/D = gear           "
-.db "           L/R = steer          "
-.db "                                "
-.db "   Press 1 to continue", 0
-.endif
 
 AKMWGetScore:
   ; Store to RAM (divided by 10) and return (unmolested) in bchl

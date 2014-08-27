@@ -15,6 +15,13 @@
 .define ColumnsScoreHighByte $c696
 
 ColumnsStart:
+  LoadScreen Tilemap_Columns
+  call ScreenOn
+  call FadeInFullPalette
+  call WaitForButton
+  call FadeOutFullPalette
+  call ScreenOff
+
   ; Record the game number
   ld a,2
   ld (GameNumber),a
@@ -62,36 +69,7 @@ ColumnsEnd_GameOver:
   call InitialiseSystem
   ld sp,TopOfStack
 
-.ifdef TEXT_MODE
-  ; Display stuff
-  ld hl,_textGameOver
-  LocationToDE 0, 2
-  call WriteText
-
-_textGameOver:
-.db "             Columns            "
-.db "                                "
-.db "   Wait a minute...             "
-.db "                                "
-.db "   You died?!?                  "
-.db "                                "
-.db "   But you had __:__ left!      "
-.db "                                "
-.db "   Think of all the points you  "
-.db "   could have got!              "
-.db "                                "
-.db "                                "
-.db "                                "
-.db "                                "
-.db "                                "
-.db "                                "
-.db "                                "
-.db "                                "
-.db "                                "
-.db "   Press 1 to continue", 0
-.else
   jp FinalResults
-.endif
 
 ColumnsGetScore:
   ; We truncate to 16 bits, so a maximum of 655350
