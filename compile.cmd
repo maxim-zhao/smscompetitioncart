@@ -13,4 +13,4 @@ for %%f in (CompetitionCart2.sms.asm Game-*.asm) do (
   echo %%~nf.o >> linkfile
 )
 
-"%WLAPATH%\wlalink.exe" -drvs linkfile CompetitionCart.sms
+"%WLAPATH%\wlalink.exe" -drvs linkfile CompetitionCart.sms 2>&1 | find /v " has 00000 bytes "
