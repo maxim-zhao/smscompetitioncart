@@ -9,15 +9,16 @@ defaultslot 0
 .endme
 
 .rombankmap
-bankstotal 37
+bankstotal 53
 banksize $4000
-banks 37
+banks 53
 .endro
 
 .define HangOnStartBank  2
 .define AKMWStartBank    4
-.define ColumnsStartBank 12
-.define SonicStartBank   20
+.define SonicStartBank   12
+.define ColumnsStartBank 28
+.define DrRobotniksStartBank 36
 
 ; Memory map (for harness)
 ; Note that we use the memory right up to $dfff - we assume there's no writes going to Sega paging registers any more
@@ -87,7 +88,7 @@ nop
 
 .macro LoadScreen
   ld a,:Tilemaps
-  ld ($8000),a
+  ld (Slot2Control),a
   ld hl, Tilemaps + 32*24*2*\1
   call LoadScreenImpl
 .endm
