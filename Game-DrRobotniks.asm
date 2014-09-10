@@ -5,6 +5,9 @@
 ; Memory addresses
 .define ControlInputs $ca18
 .define MenuIndex     $d401
+.define VBlankPageBackup $d484
+.define GameFunctionPointer $c94e
+.define Score $ccc0 ; 32-bit little-endian (!)
 
 .section "DrRobotniks helpers" free
 
@@ -29,21 +32,26 @@ DrRobotniksStart:
   jp LoadGame
   
 DrRobotniksFrameHandler:
-/*
-  ; af, bc, de, hl are safe to use
-  ; What I replaced to get here
-  push ix
-  push iy
-  
+  ; All registers are safe to use
+  ; We replaced something useless so there's nothing to redo
+
   call CheckForReset
 
+  ; Check the game state pointer
+  ; $0ad2 = game over
+  ; $0a9b = in-game
+  ld hl,(GameFunctionPointer)
+  ld a,h
+  cp $0a
+  jr nz,_ReturnToGame
+
+  ld a,l
+  cp $d2
+  jr z,_GameOver
+
   ; Are we in the game?
-  ld a,(DrRobotniksModeControl)
-  cp DrRobotniksModeControl_InGame
-  jr nz,+ ; No: do nothing
-  ld a,(DrRobotniksIsPaused)
-  or a
-  jr nz,+ ; This is 1 if the game is not actually active... (paused, "Ready", "Game Over")
+  cp $9b
+  jr nz,_ReturnToGame
 
   ; Decrement timer
   ld hl,(FrameCounter)
@@ -52,24 +60,26 @@ DrRobotniksFrameHandler:
   ld a,h
   or l
   jp z,TimeUp
-*/
+  
   ; That's it!
-+:ld a,:DrRobotniks
+_ReturnToGame:
+  ld a,:DrRobotniks
   ld hl,DrRobotniksReturnAddress
   push hl
     jp JumpBack
   
 DrRobotniksGetScore:
-/*
-  ; We truncate to 16 bits, so a maximum of 655350
-  ld hl,(DrRobotniksScoreLowWord)
-  ld a,(DrRobotniksScoreHighByte)
-  or a
-  jr z,+
-  ld hl,$ffff
-+:ld (DrRobotniksScoreDividedBy10),hl
-*/
+  ld hl,Score
+  ld de,DrRobotniksScore
+  ld bc,4
+  ldir
   ret
+  
+_GameOver:
+  call InitialiseSystem
+  ld sp,TopOfStack
+
+  jp FinalResults
 .ends
 
 .bank DrRobotniksStartBank slot 0
@@ -77,10 +87,8 @@ DrRobotniksGetScore:
 DrRobotniks:
 .incbin "Dr. Robotnik's Mean Bean Machine.sms" skip $00000 read $4000
 
-.define DrRobotniksReturnAddress 0 ; TODO
-
 .orga $0003
-.section "Intialisation patch" overwrite
+.section "Stack patch" overwrite
   ld sp,TopOfStack
   jp $0075 ; We skip the pre-init block at $0046
   
@@ -137,16 +145,16 @@ DrRobotniksSelectPageA:
   ldir                   ; 0000B1 ED B0 
 .ends
 
-.orga $32e5
+
+.orga $32e7
 .section "VBlank paging restore patch" overwrite
-;    ld     a,$02           ; 0032E5 3E 02 
-;    ld     ($ffff),a       ; 0032E7 32 FF FF 
-;    ld     a,($d484)       ; 0032EA 3A 84 D4 
+;    ld     a,$02           ; 0032E5 3E 02 ; This doesn't do anything, we leave it there
+;    ld     ($ffff),a       ; 0032E7 32 FF FF ; We patch this to jump out
+;    ld     a,($d484)       ; 0032EA 3A 84 D4 ; Paging restore
 ;    ld     ($ffff),a       ; 0032ED 32 FF FF 
-.rept 5
-  nop ; no point, maybe we can use this for a hook?
-.endr
-  ld a,($d484)
+  jp JumpOut
+DrRobotniksReturnAddress:
+  ld a,(VBlankPageBackup)
   call DrRobotniksSelectPageA
 .ends
 
@@ -186,7 +194,7 @@ DrRobotniksSelectPageA:
  PagingA $3166, $2
  PagingA $3278, $2
  PagingA $32c5, $f
- PagingA $32e5, $2
+; PagingA $32e5, $2
  PagingA $3555, $8
  PagingA $358f, $2
  PagingA $365e, $e
@@ -206,12 +214,39 @@ DrRobotniksSelectPageA:
 .orga $4000
 .incbin "Dr. Robotnik's Mean Bean Machine.sms" skip $04000 read $4000
 
+.orga $4a2b
+;    ld     a,($ca18)       ; 004A2B 3A 18 CA 
+; ...
+; (some bytes I can overwrite)
+.section "Menu skip 1" overwrite
+  ld a,2
+  ld (MenuIndex),a
+  jp $4a94
+.ends
+
+.orga $4ead
+;    ld     hl,($d1fc)      ; 004EAA 2A FC D1 
+;    ld     de,$0001        ; 004EAD 11 01 00 <-- patch here
+;    xor    a               ; 004EB0 AF 
+;    sbc    hl,de           ; 004EB1 ED 52 
+;    ld     ($d1fc),hl      ; 004EB3 22 FC D1 
+;    jr     z,$4ebf         ; 004EB6 28 07 
+.section "Disable title screen demo countdown" overwrite
+  ld de,0
+.ends
+
 .orga $4ecc
-.section "Intro skip" overwrite
 ;    ld     a,($ca18)       ; 004ECC 3A 18 CA ; Check control inputs
 ;    and    $30             ; 004ECF E6 30 
 ;    jr     nz,$4ede        ; 004ED1 20 0B 
+.section "Intro skip" overwrite
   jp $4ede
+.ends
+
+.orga $664f
+;    ld     a,($ca18)       ; 00664F 3A 18 CA 
+.section "Menu skip 2" overwrite
+  jp $6684
 .ends
 
 ; Generated...
@@ -248,16 +283,6 @@ DrRobotniksSelectPageA:
  PagingB $49e4
  PagingB $4c9f
  
-/*
-.orga $7f00
-.section "Paging helper" overwrite
-DrRobotniksPagingHelper:
-  ld (Slot2Control),a
-  ld (Slot2PageNumber),a
-  ret
-
-.ends
-*/
 .bank DrRobotniksStartBank+2
 .org 0
 .incbin "Dr. Robotnik's Mean Bean Machine.sms" skip $08000 read $4000

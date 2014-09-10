@@ -9,25 +9,30 @@ defaultslot 0
 .endme
 
 .rombankmap
-bankstotal 53
+bankstotal 69
 banksize $4000
-banks 53
+banks 69 ; 64 = 4MBit... we're over
 .endro
 
-.define HangOnStartBank  2
-.define AKMWStartBank    4
-.define SonicStartBank   12
-.define ColumnsStartBank 28
-.define DrRobotniksStartBank 36
+.enum 2
+; numbers are the size (in 16KB banks) of the game in question...
+HangOnStartBank       dsb 2
+AKMWStartBank         dsb 8
+SonicStartBank        dsb 16
+ColumnsStartBank      dsb 8
+DrRobotniksStartBank  dsb 16
+OutRunStartBank       dsb 16
+.ende
 
 ; Memory map (for harness)
 ; Note that we use the memory right up to $dfff - we assume there's no writes going to Sega paging registers any more
 .enum $e000 desc export
-Slot2PageNumber          db ; Last page mapped to slot 2
+Slot2PageNumber          db ; Last page mapped to slot 2. This ends up in $dfff so any game code reading there or $ffff will still work.
 FrameCounter             dw ; Enough for up to 21.8 minutes (at 50Hz)...
 AKMWMoneyDividedBy10     db ; Score from game 1
 HangOnScoreDividedBy10   dw ; Score from game 2
-ColumnsScoreDividedBy10  dw ; Score from game 3
+ColumnsScoreDividedBy10  dw ; Score from game 3, truncated to 2 bytes
+DrRobotniksScore         dsb 4 ; takes a lot of space...
 RAMJumpHelpers           dsb 9 ; RAM-located code for jumping between the game and the framework
 GameNumber               db ; Current game
 TopOfStack               db ; Rest of space is for games to use, they need to have their stacks patched
