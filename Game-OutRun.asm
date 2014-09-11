@@ -3,7 +3,12 @@
 .bank 0 slot 0
 
 ; Memory addresses
-.define OutRunState $c102 ; I think
+.define GameState $c102
+.define Score $de21 ; Stored as BCD, divided by 10
+; e.g. 12 34 56 78 = 123456780, but high digit is not shown in-game
+; e.g.    fast run = 1597620
+; e.g.    slow run =   26052 (time up)
+; e.g.      my run = 1437980
 
 .section "OutRun helpers" free
 
@@ -28,26 +33,16 @@ OutRunStart:
   jp LoadGame
   
 OutRunFrameHandler:
-  ; TODO
-
+  ; All registers are safe to use
+  
   call CheckForReset
-/*
+
   ; Check the game state pointer
-  ; $0ad2 = game over
-  ; $0a9b = in-game
-  ld hl,(GameFunctionPointer)
-  ld a,h
-  cp $0a
+  ; $0b = in-game
+  ld a,(GameState)
+  cp $0b
   jr nz,_ReturnToGame
 
-  ld a,l
-  cp $d2
-  jr z,_GameOver
-
-  ; Are we in the game?
-  cp $9b
-  jr nz,_ReturnToGame
-*/
   ; Decrement timer
   ld hl,(FrameCounter)
   dec hl
@@ -59,10 +54,15 @@ OutRunFrameHandler:
   ; That's it!
 _ReturnToGame:
   ld a,:OutRun
-  ld hl,0;OutRunReturnAddress TODO
+  ld hl,OutRunReturnAddress
   push hl
-    jp JumpBack
+  jp JumpBack
   
+OutRunEnd:
+  call InitialiseSystem
+  ld sp,TopOfStack
+  jp DrRobotniksStart
+
 OutRunGetScore:
 /*
   TODO
@@ -113,8 +113,26 @@ GameStart:
   ld a,(Slot2PageNumber)
 .ends
 
- nopOut $185 3 ; Reset button jump
+.orga $17a
+.section "Reset button check removal, plus VBlank hook" overwrite
+; in     a,($dd)         ; 00017A DB DD 
+; and    $10             ; 00017C E6 10 
+; ld     hl,$c10b        ; 00017E 21 0B C1 
+; ld     c,(hl)          ; 000181 4E 
+; ld     (hl),a          ; 000182 77 
+; xor    c               ; 000183 A9 
+; and    c               ; 000184 A1 
 ; jp     nz,$081a        ; 000185 C2 1A 08 
+  jp JumpOut
+.define OutRunReturnAddress $0188
+.ends
+
+ nopOut $023c 1 ; Title screen timeout - the same counter is used for other phases of the attract mode, but the decrement code is specific to each phase
+; dec    hl              ; 00023C 2B 
+
+ nopOut $3ef9 1 ; Timer decrement (frame part)
+; dec    (hl)            ; 003EF9 35 
+
 
 .orga $01ba
 .section "VBlank paging restore" overwrite
@@ -203,8 +221,19 @@ GameStart:
  PagingA $4fb6,$05
  PagingA $4fe6,$05
  PagingA $5104,$05
+ 
+.orga $5153
+.section "Stage end hook" overwrite
+; call   $519b           ; 005153 CD 9B 51 
+; call   $5203           ; 005156 CD 03 52
+; ...
+  ld hl,OutRunEnd
+  ld (JumpOutAddress), hl
+  jp JumpOut
+.ends
 
 .orga $7ff0-10-7-2
+; Some FFs at the end of the bank
 .section "Paging helpers" overwrite
 ; Here's our helpers
 OutRunSelectPageAWithAdjustment: ; 2 bytes

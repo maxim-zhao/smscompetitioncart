@@ -79,7 +79,7 @@ start:
   call InitialiseSystem
   call TitleScreen
 
-  jp DrRobotniksStart;SonicStart
+  jp OutRunStart;SonicStart
   
 .ends
 
