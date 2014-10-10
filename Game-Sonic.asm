@@ -1,5 +1,7 @@
 .include "Common.inc"
 
+.ifdef SonicStartBank
+
 .bank 0 slot 0
 
 .section "Sonic helpers" free
@@ -12,11 +14,10 @@ SonicStart:
   call ScreenOff
 
   ; Record the game number
-  ld a,-1 ; no score from this game
+  ld a, 1
   ld (GameNumber),a
   ; Patch in where to go...
-  ld hl,SonicFrameHandler
-  ld (JumpOutAddress), hl
+  SetFrameHandler SonicFrameHandler
 
   ; Jump to the game
   ld a,:Sonic
@@ -48,21 +49,26 @@ SonicFrameHandler:
   or l
   jp z,TimeUp
   
-  ; We can't detect 100 rings in here... we catch it in the game?
+  ; We can't detect 100 rings in here... we catch it in the game
 
 +:; Return to game
   ld a,:Sonic
   ld hl,SonicReturnAddress
   push hl
   jp JumpBack
-  
+    
 SonicEnd:
-  ; Clear things up
+  ld a,1
+  ld (SonicScore),a
   call InitialiseSystem
   ld sp,TopOfStack
-
-  jp AKMWStart
-
+  jp DrRobotniksStart
+/*  
+SonicGetScore:
+  ld a,(SonicRingCounter)
+  ld (SonicRings),a
+  ret
+*/
 .ends
 
 
@@ -197,9 +203,7 @@ SonicLevelChooser: ; 6 bytes
 ;    ld     ($d2aa),a       ; 0039C3 32 AA D2  
 ;    ld     a,($d246)       ; 0039C6 3A 46 D2  Increment lives
 ; ...
-  ld hl,SonicEnd
-  ld (JumpOutAddress), hl
-  jp JumpOut
+  ExitTo SonicEnd
 .ends
 
 .macro m_Sonic_fffe_a
@@ -359,3 +363,5 @@ SonicLevelChooser: ; 6 bytes
 .bank SonicStartBank+15
 .org 0
 .incbin "Sonic The Hedgehog.sms" skip $3c000 read $4000
+
+.endif

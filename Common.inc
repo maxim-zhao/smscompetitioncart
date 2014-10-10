@@ -8,31 +8,42 @@ slot 2 $8000
 defaultslot 0
 .endme
 
-.rombankmap
-bankstotal 69
-banksize $4000
-banks 69 ; 64 = 4MBit... we're over
-.endro
+.emptyfill $aa
 
-.enum 2
+; Enumeration to define bank numbers
+; Has to come before the rombankmap
+.enum 0
+Framework             db ; Framework code, boot, etc
+Framework2            db ; Pretty much just the ROM headers...
+Mod2PSG2Data          db
 ; numbers are the size (in 16KB banks) of the game in question...
-HangOnStartBank       dsb 2
-AKMWStartBank         dsb 8
+;HangOnStartBank       dsb 2
+;AKMWStartBank         dsb 8
 SonicStartBank        dsb 16
-ColumnsStartBank      dsb 8
+;ColumnsStartBank      dsb 8
 DrRobotniksStartBank  dsb 16
 OutRunStartBank       dsb 16
+; End marker
+NumberOfBanks         .db
 .ende
+
+.rombankmap
+bankstotal NumberOfBanks
+banksize $4000
+banks NumberOfBanks
+.endro
 
 ; Memory map (for harness)
 ; Note that we use the memory right up to $dfff - we assume there's no writes going to Sega paging registers any more
 .enum $e000 desc export
 Slot2PageNumber          db ; Last page mapped to slot 2. This ends up in $dfff so any game code reading there or $ffff will still work.
 FrameCounter             dw ; Enough for up to 21.8 minutes (at 50Hz)...
-AKMWMoneyDividedBy10     db ; Score from game 1
-HangOnScoreDividedBy10   dw ; Score from game 2
-ColumnsScoreDividedBy10  dw ; Score from game 3, truncated to 2 bytes
-DrRobotniksScore         dsb 4 ; takes a lot of space...
+;AKMWMoneyDividedBy10     db ; Score from game 1
+;HangOnScoreDividedBy10   dw ; Score from game 2
+;ColumnsScoreDividedBy10  dw ; Score from game 3, truncated to 2 bytes
+OutRunScore              db ; 1 point for finishing
+SonicScore               db ; 1 point for finishing
+DrRobotniksScore         dsb 4
 RAMJumpHelpers           dsb 9 ; RAM-located code for jumping between the game and the framework
 GameNumber               db ; Current game
 TopOfStack               db ; Rest of space is for games to use, they need to have their stacks patched
@@ -98,6 +109,18 @@ nop
   call LoadScreenImpl
 .endm
 
+; Games should set this as they bootstrap
+.macro SetFrameHandler
+  ld hl,\1
+  ld (JumpOutAddress), hl
+.endm
+
+; Games may use this to jump out of the game from within game code
+.macro ExitTo
+  SetFrameHandler \1
+  jp JumpOut
+.endm
+
 ; Defines
 .define Port_VDPAddress      $bf ; w
 .define Port_VDPRegisters    $bf ; w
@@ -116,8 +139,7 @@ nop
 .define Slot1Control $4000
 .define Slot2Control $8000
 
+; See "RAMJumpHelpersCode" for these magic numbers
 .define JumpOut RAMJumpHelpers + 0
 .define JumpOutAddress RAMJumpHelpers + 2
 .define JumpBack RAMJumpHelpers + 5
-
-

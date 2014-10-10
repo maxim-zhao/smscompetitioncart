@@ -1,5 +1,7 @@
 .include "Common.inc"
 
+.ifdef ColumnsStartBank
+
 .bank 0 slot 0
 
 .section "Columns helpers" free
@@ -27,8 +29,7 @@ ColumnsStart:
   ld (GameNumber),a
 
   ; Patch in where to go...
-  ld hl,ColumnsFrameHandler
-  ld (JumpOutAddress), hl
+  SetFrameHandler ColumnsFrameHandler
 
   ; Jump to the game
   ld a,:Columns
@@ -130,9 +131,7 @@ Columns:
 .section "Game Over patch" overwrite
 ; Hit only after game over
 ; We patch the VBlank helper and jump to it to escape the game.
-  ld hl,ColumnsEnd_GameOver
-  ld (JumpOutAddress), hl
-  jp JumpOut
+  ExitTo ColumnsEnd_GameOver
 .ends
 
 ; Paging patches...
@@ -254,3 +253,5 @@ ColumnsPagingHelper:
 .bank ColumnsStartBank+7
 .org 0
 .incbin "Columns.sms" skip $1c000 read $4000
+
+.endif

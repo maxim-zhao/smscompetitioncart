@@ -1,5 +1,7 @@
 .include "Common.inc"
 
+.ifdef HangOnStartBank
+
 .bank 0 slot 0
 
 .section "Hang On helpers" free
@@ -24,8 +26,7 @@ HangOnStart:
   ld (GameNumber),a
 
   ; Patch in where to go...
-  ld hl,HangOnFrameHandler
-  ld (JumpOutAddress), hl
+  SetFrameHandler HangOnFrameHandler
 
   ; Jump to the game
   ld a,:HangOn
@@ -103,9 +104,7 @@ jp JumpOut
   or l
   djnz -
   ; We patch the VBlank helper and jump to it to escape the game.
-  ld hl,HangOnEnd
-  ld (JumpOutAddress), hl
-  jp JumpOut
+  ExitTo HangOnEnd
 .ends
 
  patchWord $0003+1, TopOfStack ; move the stack down
@@ -116,3 +115,5 @@ jp JumpOut
 .bank HangOnStartBank+1
 .org 0
 .incbin "Hang On.sms" skip $4000 read $4000
+
+.endif

@@ -1,5 +1,7 @@
 .include "Common.inc"
 
+.ifdef AKMWStartBank
+
 .bank 0 slot 0
 
 .section "AKMW helpers" free
@@ -28,8 +30,7 @@ AKMWStart:
   xor a
   ld (GameNumber),a
   ; Patch in where to go...
-  ld hl,AKMWFrameHandler
-  ld (JumpOutAddress), hl
+  SetFrameHandler AKMWFrameHandler
 
   ; Jump to the game
   ld a,:AlexKiddInMiracleWorld
@@ -353,3 +354,5 @@ AKMWPagingHelper2:
 .bank AKMWStartBank+7
 .org 0
 .incbin "akbios.sms" skip $1c000 read $4000
+
+.endif

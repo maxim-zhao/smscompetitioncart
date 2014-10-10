@@ -1,5 +1,7 @@
 .include "Common.inc"
 
+.ifdef OutRunStartBank
+
 .bank 0 slot 0
 
 ; Memory addresses
@@ -13,20 +15,19 @@
 .section "OutRun helpers" free
 
 OutRunStart:
-/*  LoadScreen Tilemap_OutRun
+  LoadScreen Tilemap_OutRun
   call ScreenOn
   call FadeInFullPalette
   call WaitForButton
   call FadeOutFullPalette
   call ScreenOff
-*/
+
   ; Record the game number
-  ld a,2
+  ld a,0
   ld (GameNumber),a
 
   ; Patch in where to go...
-  ld hl,OutRunFrameHandler
-  ld (JumpOutAddress), hl
+  SetFrameHandler OutRunFrameHandler
 
   ; Jump to the game
   ld a,:OutRun
@@ -59,19 +60,45 @@ _ReturnToGame:
   jp JumpBack
   
 OutRunEnd:
+  ld a,1
+  ld (OutRunScore),a
   call InitialiseSystem
   ld sp,TopOfStack
-  jp DrRobotniksStart
+  jp SonicStart
 
-OutRunGetScore:
 /*
-  TODO
-  ld hl,Score
+OutRunGetScore:
+  ; Get the bytes and do the maths...
+  ld ix,Score
+  ld a,(ix+3)
+  call BCDToBin
+  ld de,10
+  call DETimesAToBCHL ; low digit * 10
+  push bc
+  push hl
+    ld a,(ix+2)
+    call BCDToBin
+    ld de,1000
+    call DETimesAToBCHL ; next digit * 1000
+    push bc
+    push hl
+      ld a,(ix+1)
+      call BCDToBin
+      ld de,100000
+      call DETimesAToBCHL ; next digit * 100000
+      push bc
+      push hl
+        ld a,(ix+1)
+        call BCDToBin
+        ld de,100000
+        call DETimesAToBCHL ; next digit * 100000
+
   ld de,OutRunScore
   ld bc,4
   ldir
-*/
+
   ret
+*/
 .ends
 
 .bank OutRunStartBank slot 0
@@ -227,9 +254,7 @@ GameStart:
 ; call   $519b           ; 005153 CD 9B 51 
 ; call   $5203           ; 005156 CD 03 52
 ; ...
-  ld hl,OutRunEnd
-  ld (JumpOutAddress), hl
-  jp JumpOut
+  ExitTo OutRunEnd
 .ends
 
 .orga $7ff0-10-7-2
@@ -307,3 +332,5 @@ OutRunSelectPageH: ; 10 bytes
 .bank OutRunStartBank+15
 .org 0
 .incbin "Out Run.sms" skip $3c000 read $4000
+
+.endif

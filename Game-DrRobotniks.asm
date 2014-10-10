@@ -1,5 +1,7 @@
 .include "Common.inc"
 
+.ifdef DrRobotniksStartBank
+
 .bank 0 slot 0
 
 ; Memory addresses
@@ -12,20 +14,19 @@
 .section "DrRobotniks helpers" free
 
 DrRobotniksStart:
-/*  LoadScreen Tilemap_DrRobotniks
+  LoadScreen Tilemap_DrRobotniks
   call ScreenOn
   call FadeInFullPalette
   call WaitForButton
   call FadeOutFullPalette
   call ScreenOff
-*/
+
   ; Record the game number
   ld a,2
   ld (GameNumber),a
 
   ; Patch in where to go...
-  ld hl,DrRobotniksFrameHandler
-  ld (JumpOutAddress), hl
+  SetFrameHandler DrRobotniksFrameHandler
 
   ; Jump to the game
   ld a,:DrRobotniks
@@ -79,7 +80,7 @@ _GameOver:
   call InitialiseSystem
   ld sp,TopOfStack
 
-  jp FinalResults
+  jp FinalResults ; will get the score
 .ends
 
 .bank DrRobotniksStartBank slot 0
@@ -338,3 +339,5 @@ DrRobotniksReturnAddress:
 .bank DrRobotniksStartBank+15
 .org 0
 .incbin "Dr. Robotnik's Mean Bean Machine.sms" skip $3c000 read $4000
+
+.endif

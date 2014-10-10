@@ -186,9 +186,11 @@ InitialiseSystem:
   ld a,:MusicData
   ld hl,MusicData
   call PSGMOD_LoadModule
+  ld hl,+ ; safe "do nothing" function
+  call PSGMOD_SetCallbackFunction
   call PSGMOD_Start
   ei
-  ret
++:ret
 
 PaletteData:
 .db $00 $10 $34 $25 $35 $39 $2A $3A $2B $0F $1F $3F 0 0 0 0
@@ -229,10 +231,12 @@ Tilemaps:
 .incbin "Tilemaps.bin" skip 32*2*4 ; top 4 rows are digits
 .enum 0 asc export
 Tilemap_TitleScreen db
+;Tilemap_AKMW        db
+;Tilemap_HangOn      db
+;Tilemap_Columns     db
+Tilemap_OutRun      db
 Tilemap_Sonic       db
-Tilemap_AKMW        db
-Tilemap_HangOn      db
-Tilemap_Columns     db
+Tilemap_DrRobotniks db
 Tilemap_TimeUp      db
 Tilemap_Results     db
 .ende
@@ -756,35 +760,79 @@ FinalResults:
   
   ; Process the score for the game in progress
   ld a,(GameNumber)
-  or a
-  call z,AKMWGetScore
+;  or a
+;  call z,OutRunGetScore
   dec a
-  call z,HangOnGetScore
+;  call z,SonicGetScore
   dec a
-  call z,ColumnsGetScore
+  call z,DrRobotniksGetScore
 
   LoadScreen Tilemap_Results
 
+  ; Draw the scores
+  ld a,(OutRunScore)
+  ld bc,0
+  ld h,0
+  ld l,a
+  LocationToDE 20, 4
+  call WriteNumberSevenDigits
+
+  ld a,(SonicScore)
+  ld bc,0
+  ld h,0
+  ld l,a
+  LocationToDE 20, 9
+  call WriteNumberSevenDigits
+
+  ld hl,(DrRobotniksScore+0)
+  ld bc,(DrRobotniksScore+2)
+  LocationToDE 20, 14
+  call WriteNumberSevenDigits
+  
+  ; Calculate the total
+  ld hl,(DrRobotniksScore+0)
+  ld bc,(DrRobotniksScore+2)
+  ld a,(OutRunScore)
+  ld e,a
+  ld a,(SonicScore)
+  add a,e
+  ld e,a
+  ld d,0
+  call AddDEToBCHLLow
+
+
+/*
   ; Draw stuff. We retrieve the scores from RAM and scale them up as necessary.
-  ld a,(AKMWMoneyDividedBy10)
-  ld de,10
-  call DETimesAToBCHL
+  ld ix,OutRunScore
+  ld h,(ix+0)
+  ld l,(ix+1)
+  ld b,(ix+2)
+  ld c,(ix+3)
+  ld a,10
+  ; call BCHLTimesAToBCHL ; TODO
   LocationToDE 5, 4
   call WriteNumberSevenDigits
 
-  ld de,(HangOnScoreDividedBy10)
-  ld a,10
+  ld a,(SonicRings)
+  ld de,10000
   call DETimesAToBCHL
   LocationToDE 5, 9
   call WriteNumberSevenDigits
 
-  ld de,(ColumnsScoreDividedBy10)
+  ld ix,DrRobotniksScore
+  ld h,(ix+0)
+  ld l,(ix+1)
+  ld b,(ix+2)
+  ld c,(ix+3)
   ld a,10
-  call DETimesAToBCHL
+  ; call BCHLTimesAToBCHL ; TODO
   LocationToDE 5, 14
   call WriteNumberSevenDigits
+*/
+
 
   ; Calculate the total score
+  /*
   ; 1. AKMW x 100. Can't overflow...
   ld a,(AKMWMoneyDividedBy10)
   ld de, 100*10
@@ -829,7 +877,7 @@ FinalResults:
     call AddDEToBCHLLow
   pop de
   call AddDEToBCHLHigh
-    
+    */
   ; Done! Now to display it...
   LocationToDE 17, 19
   call WriteNumber32
@@ -987,6 +1035,7 @@ _FadePaletteEntry:
 .db $07, $06, $94, $15, $44 ; date/time - not used
 .dw $ef36, $10000 - $ef36 ; fake checksum - must be non-zero in LSB
 .dsb 6 $00 ; unused bytes - must be zero
+; We can't also make it a valid SDSC header...
 .ends
 
 .slot 2
