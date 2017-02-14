@@ -4,13 +4,14 @@
 
 ; Benchmarking the compression of our large tiles blob...
 ;
-; Compression  Bytes  Ratio  Load time (cycles)  Ratio
-; None         10400   100%              160068   100%
-; PScompr       8881    85%             1354926   846%
-; Sonic 1       5888    57%             1026969   642%
-; PSGcompr      5388    52%             1600820  1000%
-; PuCrunch      4226    41%             3475587  2171%
-; aPLib         4170    40%             3640882  2275%
+; Compression  Data size  Ratio  Decompressor size  Load time (cycles)  Ratio
+; None              9728  100%                  24              161365   100%
+; PScompr           8338   86%                  54             1335193   827%
+; Sonic 1           5507   57%                 162             1011588   627%
+; PSGcompr          5029   52%                 223             1576965   977%
+; PuCrunch          4005   41%                 414             3394510  2104%
+; aPLib             3946   41%                 304             3552372  2201%
+; aPLib-fast        3946   41%                 334             1789523  1109%
 ;
 ; Decompressor sizes are not included in the byte counts.
 
@@ -150,6 +151,7 @@ InitialiseSystem:
   ; Load graphics
   ld a,:Tiles
   ld ($8000),a
+x:
 .if TILE_COMPRESSION == "raw"
   ld hl,Tiles
   ld de,$4000
@@ -206,6 +208,7 @@ VdpDataEnd:
 .slot 2
 .section "Graphics data" superfree
 Tiles:
+.block "Tile_data"
 .if TILE_COMPRESSION == "raw"
 .incbin "Tiles.bin" fsize TilesSize
 .endif
@@ -224,7 +227,7 @@ Tiles:
 .if TILE_COMPRESSION == "Sonic"
 .incbin "Tiles.soniccompr"
 .endif
-
+.endb
 .ends
 .section "Tilemaps" superfree
 Tilemaps:
@@ -243,8 +246,17 @@ Tilemap_Results     db
 .ends
 .slot 0
 
+.section "outi block" align 256
+outiblock:
+.rept 256
+  outi
+.endr
+  ret
+.ends
+
+.section "Tile loader"
+.block "Tile_loader"
 .if TILE_COMPRESSION == "raw"
-.section "Raw data loader" free
 raw_decompress:
   ; hl = src
   ; de = dest
@@ -266,14 +278,6 @@ raw_decompress:
   ; Output remaining bits
 +:ld ixh,>outiblock
   jp (ix) ; and ret
-.ends
-.section "outi block" align 256
-outiblock:
-.rept 256
-  outi
-.endr
-  ret
-.ends
 .endif
 .if TILE_COMPRESSION == "PSG"
 .include "Phantasy Star Gaiden decompressor.inc"
@@ -283,7 +287,7 @@ outiblock:
 .endif
 .if TILE_COMPRESSION == "aPLib"
 .define aPLibToVRAM
-.include "aplib-z80.asm"
+.include "aplib-z80-fast.asm"
 .endif
 .if TILE_COMPRESSION == "PuCrunch"
 .define PuCrunchToVRAM
@@ -292,6 +296,8 @@ outiblock:
 .if TILE_COMPRESSION == "Sonic"
 .include "Sonic decompressor.inc"
 .endif
+.endb
+.ends
 
 .section "Maths helpers" free
 BCDToBin:

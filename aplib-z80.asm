@@ -13,10 +13,6 @@
 ; of VRAM to VRAM copies, which also makes it pretty slow.
 ; This file is using WLA-DX syntax quite heavily, you'd better use it too...
 
-.define calcblocks
-; comment out this line to suppress the block size notifications
-; (useful for optimising to see size changes)
-
 .struct aPLibMemoryStruct
 bits     db
 byte     db ; not directly referenced, assumed to come after bits
@@ -34,10 +30,6 @@ mem instanceof aPLibMemoryStruct
 ; but it makes it somewhat harder to read. "depack" is the entry point and "aploop" is
 ; the main loop.
 
-.section "aPLib" free
-.ifdef calcblocks
-.block "aPLib"
-.endif
 _ap_getbit:
 	push bc
 		ld bc,(mem.bits)
@@ -329,8 +321,3 @@ _below256:
 */
   ret
 .endif
-  
-.ifdef calcblocks
-.endb
-.endif
-.ends

@@ -110,8 +110,8 @@ regy      db
 ; Entry: HL = Source packed data
 ;        DE = Destination for unpacked data
 
-.section "Pucrunch unpacker" free
-.block "Pucrunch" ; for finding out the compiled size
+;.section "Pucrunch unpacker" free
+;.block "Pucrunch" ; for finding out the compiled size
 Uncrunch:
   ld (OutPtr),de
   ld c,$bf
@@ -526,5 +526,5 @@ _getchk:
 ;  or a  ; clear carry flag                                  ; B7
   ret                                                       ; C9
 
-.endb
-.ends
+;.endb
+;.ends

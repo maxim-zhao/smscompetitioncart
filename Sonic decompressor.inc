@@ -2,8 +2,7 @@
 ; 
 ; Needs 8 bytes of RAM for temporary storage. Define Sonic1TileLoaderMemory as the start address of the RAM to use.
 
-.block "TileLoaderSonic1"
-.section "Tile loader (Sonic 1)" free
+;.section "Tile loader (Sonic 1)" free
 
 ; RAM usage
 .enum Sonic1TileLoaderMemory export
@@ -200,5 +199,4 @@ _rowIndexTable:
 .db %01000000
 .db %10000000
 
-.ends
-.endb
+;.ends

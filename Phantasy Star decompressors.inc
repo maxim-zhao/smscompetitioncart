@@ -59,16 +59,16 @@
 
 ;.define UseRst
 
-.section "SetVRAMAddressToDE" free
+;.section "SetVRAMAddressToDE" free
 SetVRAMAddressToDE:
   ld a,e
   out ($bf),a
   ld a,d
   out ($bf),a
   ret
-.ends
+;.ends
 
-.section "Tile loader (4 bpp RLE, no di/ei)" free
+;.section "Tile loader (4 bpp RLE, no di/ei)" free
 ; Decompresses tile data from hl to VRAM address de
 LoadTiles4BitRLENoDI:
   ld b,$04
@@ -116,8 +116,8 @@ __:
   inc hl             ; inc hl here instead  |
   jp _b              ; repeat forever ------+
                      ; (zero count byte quits)
-.ends
-
+;.ends
+/*
 .section "Phantasy Star Tile loader (4 bpp RLE, with di/ei)" free
 LoadTiles4BitRLE:    ; Same as NoDI only with a di/ei around the VRAM access (because VBlanks will mess it up)
   ld b,$04           ; 4 bitplanes
@@ -198,7 +198,6 @@ __:ld a,(hl)         ; Get data count in a <-----------------+
   inc de             ; skip dest byte                      | |
   jp pe,-            ; if bc!=0 then repeat ---------------+ |
   jp _b              ; repeat -------------------------------+
-.ends
 
 .section "Decompress tilemap to VRAM" free
 ; Decompresses tilemap data from hl to VRAM address de
@@ -246,3 +245,4 @@ __:
   jr _b              ; repeat forever ------+
                      ; (zero count byte quits)
 .ends
+*/

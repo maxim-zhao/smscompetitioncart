@@ -8,8 +8,6 @@
 ; call PSG_decompress
 ;
 
-.section "PSG decompressor" free
-
 .define vram_ptr PSGDecoderBuffer          ; word: VRAM address
 .define buffer PSGDecoderBuffer + 2            ; 32-byte decompression buffer
 
@@ -173,5 +171,3 @@ _OutputTileToVRAM:
   or c
   jp nz,_DecompressTile
   ret            ; done
-
-.ends
